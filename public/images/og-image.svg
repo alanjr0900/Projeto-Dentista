@@ -1,0 +1,10 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#fafafa"/>
+  <rect x="100" y="80" width="1000" height="470" rx="24" fill="white" stroke="#e0f0f0" stroke-width="2"/>
+  <circle cx="600" cy="200" r="80" fill="#e0f0f0"/>
+  <circle cx="600" cy="200" r="50" fill="#2d8a8a"/>
+  <ellipse cx="600" cy="420" rx="150" ry="80" fill="#e0f0f0"/>
+  <text x="600" y="350" text-anchor="middle" font-family="Georgia, serif" font-size="42" fill="#171717" font-weight="600">Consultório Dra. [Nome]</text>
+  <text x="600" y="400" text-anchor="middle" font-family="Inter, sans-serif" font-size="24" fill="#525252">Agendamento Online • 15 anos de experiência</text>
+  <text x="600" y="500" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#737373">Atendimento humanizado • Consultório próprio e rede pública</text>
+</svg>

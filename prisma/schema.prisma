@@ -1,0 +1,87 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Servico {
+  id           String        @id @default(cuid())
+  nome         String
+  descricao    String?
+  duracaoMin   Int
+  ativo        Boolean       @default(true)
+  ordem        Int           @default(0)
+  criadoEm     DateTime      @default(now())
+  atualizadoEm DateTime      @updatedAt
+  agendamentos Agendamento[]
+
+  @@index([ativo, ordem])
+}
+
+model Agendamento {
+  id               String    @id @default(cuid())
+  codigo           String    @unique @default(cuid())
+  servicoId        String
+  servico          Servico   @relation(fields: [servicoId], references: [id])
+  pacienteId       String?
+  paciente         Paciente? @relation(fields: [pacienteId], references: [id])
+  dataHora         DateTime
+  duracaoMin       Int
+  pacienteNome     String
+  pacienteTelefone String
+  pacienteEmail    String?
+  observacoes      String?
+  status           String    @default("PENDENTE")
+  criadoEm         DateTime  @default(now())
+  atualizadoEm     DateTime  @updatedAt
+  confirmadoEm     DateTime?
+  concluidoEm      DateTime?
+  canceladoEm      DateTime?
+  canceladoPor     String?
+  lembreteEnviado  Boolean   @default(false)
+  // Vínculo com o evento no Google Calendar (quando a integração está ativa).
+  // Permite cancelar/remarcar o evento certo sem buscar por texto no calendário.
+  googleEventoId   String?
+
+  @@index([dataHora, status])
+  @@index([pacienteTelefone])
+  @@index([codigo])
+}
+
+model BloqueioAgenda {
+  id         String   @id @default(cuid())
+  inicio     DateTime
+  fim        DateTime
+  motivo     String?
+  recorrente Boolean  @default(false)
+  diaSemana  Int? // 0-6 para recorrente (domingo=0)
+  criadoEm   DateTime @default(now())
+
+  @@index([inicio, fim])
+}
+
+model Configuracao {
+  id           String   @id @default(cuid())
+  chave        String   @unique
+  valor        String
+  descricao    String?
+  atualizadoEm DateTime @updatedAt
+}
+
+model Paciente {
+  id           String        @id @default(cuid())
+  nome         String
+  telefone     String        @unique
+  email        String?
+  anotacoes    String?
+  criadoEm     DateTime      @default(now())
+  atualizadoEm DateTime      @updatedAt
+  agendamentos Agendamento[]
+
+  @@index([telefone])
+  @@index([nome])
+}

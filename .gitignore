@@ -1,0 +1,37 @@
+# Dependências (instaladas por npm/yarn/pnpm)
+node_modules/
+.pnp
+.pnp.js
+
+# Artefatos de build (recriados por npm run build / npm run dev)
+.next/
+out/
+build/
+dist/
+
+# Segredos locais — nunca versionar
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# Banco local com dados de pacientes (LGPD)
+prisma/dev.db
+prisma/dev.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema/IDE
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Vercel
+.vercel

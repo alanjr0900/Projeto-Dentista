@@ -1,0 +1,8 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="400" fill="#e0f0f0"/>
+  <circle cx="200" cy="140" r="60" fill="#4aa9a9" opacity="0.2"/>
+  <circle cx="200" cy="140" r="40" fill="#2d8a8a"/>
+  <ellipse cx="200" cy="320" rx="90" ry="60" fill="#4aa9a9" opacity="0.3"/>
+  <text x="200" y="380" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#2d8a8a" font-weight="600">Dra. [Nome]</text>
+  <text x="200" y="400" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" fill="#737373">Foto placeholder</text>
+</svg>
