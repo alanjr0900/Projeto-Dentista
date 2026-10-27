@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PassoAgendamento, EstadoAgendamento, Servico } from '@/types'
@@ -60,13 +61,14 @@ function ServicoCard({ servico, selecionado, onClick }: ServicoCardProps) {
         <div className={cn(
           'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
           selecionado ? 'bg-primary-600 text-white' : 'bg-primary-100 text-primary-600'
-        )} aria-hidden="true">
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
+        )}>
+          <Image
+            src="/logo/logo-simbolo.png"
+            alt="Símbolo da Dra. Luciana Ripa"
+            width={310}
+            height={300}
+            className={cn('h-7 w-auto object-contain sm:h-8', selecionado && 'brightness-0 invert')}
+          />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-heading text-lg font-semibold text-neutral-900">{servico.nome}</h3>
