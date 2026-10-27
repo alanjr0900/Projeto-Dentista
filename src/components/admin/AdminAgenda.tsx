@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -12,6 +12,10 @@ interface AdminAgendaProps {
   stats: { hoje: number; semana: number; pendentes: number; confirmados: number }
   configuracoes: ConfiguracoesClinica
 }
+
+type AgComServico = AdminAgendaProps['agendamentosHoje'][number]
+type AcaoAgenda = 'confirmar' | 'concluir' | 'cancelar' | 'falta' | 'remarcar'
+type Toast = { tipo: 'ok' | 'erro'; texto: string }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   PENDENTE: { label: 'Pendente', className: 'badge-warning' },
@@ -26,6 +30,71 @@ export function AdminAgenda({ agendamentosHoje, agendamentosSemana, stats, confi
   const [abaAtiva, setAbaAtiva] = useState<'hoje' | 'semana' | 'lista'>('hoje')
   const [dataSelecionada, setDataSelecionada] = useState(new Date())
   const [filtroStatus, setFiltroStatus] = useState<string>('todos')
+
+  // Cópias locais para atualizar a TELA sem recarregar (3.1).
+  const [listaHoje, setListaHoje] = useState(agendamentosHoje)
+  const [listaSemana, setListaSemana] = useState(agendamentosSemana)
+  const [toast, setToast] = useState<Toast | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const mostrarToast = (novo: Toast) => {
+    setToast(novo)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }
+
+  const aplicarAcao = async (ag: AgComServico, acao: AcaoAgenda) => {
+    // 3.2 — Relógio: pede ao SERVIDOR o link de WhatsApp com o número lido
+    // do banco (mensagem com nome, serviço, data e hora). Abre em nova aba.
+    if (acao === 'remarcar') {
+      try {
+        const res = await fetch(`/api/admin/agenda?id=${ag.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        const data = await res.json()
+        if (!res.ok || !data.link) {
+          mostrarToast({ tipo: 'erro', texto: data.erro || 'Não foi possível abrir o WhatsApp do paciente.' })
+          return
+        }
+        window.open(data.link, '_blank', 'noopener,noreferrer')
+        mostrarToast({ tipo: 'ok', texto: `WhatsApp do paciente aberto em nova aba para remarcar.` })
+      } catch {
+        mostrarToast({ tipo: 'erro', texto: 'Erro ao gerar o link de remarcação.' })
+      }
+      return
+    }
+
+    // 3.1 — Cancelamento pede confirmação antes de executar.
+    if (acao === 'cancelar') {
+      const ok = window.confirm(`Cancelar o agendamento de ${ag.pacienteNome} em ${format(new Date(ag.dataHora), 'dd/MM/yyyy HH:mm')}?`)
+      if (!ok) return
+    }
+
+    const rotulos: Record<string, string> = {
+      confirmar: 'confirmado', concluir: 'marcado como concluído',
+      cancelar: 'cancelado', falta: 'marcado como falta',
+    }
+    try {
+      const res = await fetch('/api/admin/agenda', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ag.id, acao }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.erro || 'Erro ao atualizar o agendamento')
+      }
+      const data = await res.json()
+      const novoStatus = data.agendamento.status as string
+      // Atualiza status nas duas listas, sem recarregar a página.
+      setListaHoje(prev => prev.map(a => (a.id === ag.id ? { ...a, status: novoStatus } : a)))
+      setListaSemana(prev => prev.map(a => (a.id === ag.id ? { ...a, status: novoStatus } : a)))
+      mostrarToast({ tipo: 'ok', texto: `Agendamento de ${ag.pacienteNome} ${rotulos[acao]}.` })
+    } catch (e) {
+      mostrarToast({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao atualizar o agendamento' })
+    }
+  }
 
   // Agrupar agendamentos da semana por dia
   const agendamentosPorDia = agendamentosSemana.reduce((acc, ag) => {
@@ -92,7 +161,7 @@ export function AdminAgenda({ agendamentosHoje, agendamentosSemana, stats, confi
 
         <div className="p-6" role="tabpanel">
           {abaAtiva === 'hoje' && (
-            <VisaoHoje agendamentos={agendamentosHoje} />
+            <VisaoHoje agendamentos={listaHoje} onAcao={aplicarAcao} />
           )}
 
           {abaAtiva === 'semana' && (
@@ -107,13 +176,28 @@ export function AdminAgenda({ agendamentosHoje, agendamentosSemana, stats, confi
 
           {abaAtiva === 'lista' && (
             <VisaoLista 
-              agendamentos={agendamentosSemana} 
+              agendamentos={listaSemana} 
               filtroStatus={filtroStatus}
               onFiltroChange={setFiltroStatus}
+              onAcao={aplicarAcao}
             />
           )}
         </div>
       </div>
+
+      {/* Toast de sucesso/erro das ações (3.1) */}
+      {toast && (
+        <div
+          className={cn(
+            'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-soft text-sm font-medium',
+            toast.tipo === 'ok' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          {toast.texto}
+        </div>
+      )}
     </div>
   )
 }
@@ -139,7 +223,7 @@ function StatCard({ titulo, valor, icone, cor }: { titulo: string; valor: number
   )
 }
 
-function VisaoHoje({ agendamentos }: { agendamentos: AdminAgendaProps['agendamentosHoje'] }) {
+function VisaoHoje({ agendamentos, onAcao }: { agendamentos: AgComServico[]; onAcao: (ag: AgComServico, acao: AcaoAgenda) => void }) {
   if (agendamentos.length === 0) {
     return (
       <div className="text-center py-12">
@@ -158,7 +242,7 @@ function VisaoHoje({ agendamentos }: { agendamentos: AdminAgendaProps['agendamen
   return (
     <div className="space-y-3">
       {agendamentos.map((ag) => (
-        <AgendamentoCard key={ag.id} agendamento={ag} compacto />
+        <AgendamentoCard key={ag.id} agendamento={ag} compacto onAcao={onAcao} />
       ))}
     </div>
   )
@@ -259,11 +343,13 @@ function VisaoSemana({
 function VisaoLista({ 
   agendamentos, 
   filtroStatus, 
-  onFiltroChange 
+  onFiltroChange,
+  onAcao,
 }: { 
-  agendamentos: AdminAgendaProps['agendamentosSemana']
+  agendamentos: AgComServico[]
   filtroStatus: string
   onFiltroChange: (s: string) => void
+  onAcao: (ag: AgComServico, acao: AcaoAgenda) => void
 }) {
   const statusOptions = ['todos', 'PENDENTE', 'CONFIRMADO', 'CANCELADO', 'CONCLUIDO', 'FALTA', 'REMARCADO']
 
@@ -329,7 +415,7 @@ function VisaoLista({
                   </td>
                   <td className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <AcoesAgendamento agendamento={ag} />
+                      <AcoesAgendamento agendamento={ag} onAcao={onAcao} />
                     </div>
                   </td>
                 </tr>
@@ -342,7 +428,7 @@ function VisaoLista({
   )
 }
 
-function AgendamentoCard({ agendamento, compacto }: { agendamento: Agendamento & { servico: { nome: string } }; compacto?: boolean }) {
+function AgendamentoCard({ agendamento, compacto, onAcao }: { agendamento: AgComServico; compacto?: boolean; onAcao: (ag: AgComServico, acao: AcaoAgenda) => void }) {
   return (
     <div className={cn('card p-4 flex items-center gap-4', compacto && 'py-3')}>
       <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0" aria-hidden="true">
@@ -370,58 +456,91 @@ function AgendamentoCard({ agendamento, compacto }: { agendamento: Agendamento &
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        <AcoesAgendamento agendamento={agendamento} compacto />
+        <AcoesAgendamento agendamento={agendamento} compacto onAcao={onAcao} />
       </div>
     </div>
   )
 }
 
-function AcoesAgendamento({ agendamento, compacto }: { agendamento: Agendamento & { servico: { nome: string } }; compacto?: boolean }) {
+function AcoesAgendamento({ agendamento, compacto, onAcao, ocupado = false }: { agendamento: AgComServico; compacto?: boolean; onAcao: (ag: AgComServico, acao: AcaoAgenda) => void; ocupado?: boolean }) {
   const podeConfirmar = agendamento.status === 'PENDENTE'
   const podeConcluir = ['PENDENTE', 'CONFIRMADO', 'REMARCADO'].includes(agendamento.status)
   const podeCancelar = ['PENDENTE', 'CONFIRMADO', 'REMARCADO'].includes(agendamento.status)
   const podeMarcarFalta = ['PENDENTE', 'CONFIRMADO'].includes(agendamento.status)
 
+  /** Botão só-ícone, sempre com aria-label + tooltip (título). */
+  const botaoAcao = (
+    acao: AcaoAgenda,
+    texto: string,
+    classes: string,
+    icone: JSX.Element,
+    visivel: boolean
+  ) =>
+    visivel ? (
+      <button
+        type="button"
+        onClick={() => onAcao(agendamento, acao)}
+        disabled={ocupado}
+        className={cn(classes, compacto ? 'p-1.5' : 'p-2', 'rounded-xl transition-colors disabled:opacity-40')}
+        title={texto}
+        aria-label={`${texto} — agendamento de ${agendamento.pacienteNome}`}
+      >
+        {icone}
+      </button>
+    ) : null
+
   return (
     <div className="flex items-center gap-1" role="group" aria-label={`Ações para ${agendamento.pacienteNome}`}>
-      {podeConfirmar && (
-        <button className={cn('p-2 rounded-xl hover:bg-green-50 text-green-600 transition-colors', compacto ? 'p-1.5' : '')} title="Confirmar">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
+      {botaoAcao(
+        'confirmar',
+        'Confirmar',
+        'hover:bg-green-50 text-green-600',
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>,
+        podeConfirmar
       )}
-      {podeConcluir && (
-        <button className={cn('p-2 rounded-xl hover:bg-primary-50 text-primary-600 transition-colors', compacto ? 'p-1.5' : '')} title="Marcar como concluída">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        </button>
+      {botaoAcao(
+        'concluir',
+        'Marcar como concluída',
+        'hover:bg-primary-50 text-primary-600',
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>,
+        podeConcluir
       )}
-      {podeCancelar && (
-        <button className={cn('p-2 rounded-xl hover:bg-red-50 text-red-600 transition-colors', compacto ? 'p-1.5' : '')} title="Cancelar">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+      {botaoAcao(
+        'cancelar',
+        'Cancelar (com confirmação)',
+        'hover:bg-red-50 text-red-600',
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>,
+        podeCancelar
       )}
-      {podeMarcarFalta && (
-        <button className={cn('p-2 rounded-xl hover:bg-neutral-100 text-neutral-600 transition-colors', compacto ? 'p-1.5' : '')} title="Marcar falta">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-        </button>
+      {botaoAcao(
+        'falta',
+        'Marcar não compareceu (falta)',
+        'hover:bg-neutral-100 text-neutral-600',
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>,
+        podeMarcarFalta
       )}
-      <button className={cn('p-2 rounded-xl hover:bg-neutral-100 text-neutral-600 transition-colors', compacto ? 'p-1.5' : '')} title="Remarcar">
+      {botaoAcao(
+        'remarcar',
+        'Remarcar (abre WhatsApp do paciente)',
+        'hover:bg-accent-50 text-accent-700',
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
-        </svg>
-      </button>
+        </svg>,
+        true
+      )}
     </div>
   )
 }
