@@ -26,9 +26,12 @@ export function AdminPacientes({ pacientes: pacientesIniciais }: AdminPacientesP
   const [busca, setBusca] = useState('')
   const [expandido, setExpandido] = useState<string | null>(null)
 
-  const pacientesFiltrados = pacientes.filter(p => 
+  const digitosBusca = busca.replace(/\D/g, '')
+  // Busca por nome/e-mail; telefone só entra para BUSCAS COM DÍGITOS —
+  // `p.telefone.includes('')` seria sempre true e a busca por nome não filtraria.
+  const pacientesFiltrados = pacientes.filter(p =>
     p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    p.telefone.includes(busca.replace(/\D/g, '')) ||
+    (digitosBusca.length > 0 && p.telefone.includes(digitosBusca)) ||
     p.email?.toLowerCase().includes(busca.toLowerCase())
   )
 

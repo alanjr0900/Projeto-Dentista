@@ -685,7 +685,16 @@ export function AbaAgendamento() {
   const handleDadosChange = (campo: string, valor: string | boolean) => {
     setEstado(prev => ({
       ...prev,
-      dadosPaciente: { ...prev.dadosPaciente, [campo]: valor } as EstadoAgendamento['dadosPaciente'],
+      // Garante TODAS as chaves desde o primeiro campo digitado: um spread
+      // sobre undefined criaria { sóUmCampo } e qualquer leitura de outro
+      // campo no render (ex.: telefone.replace no 2.1) derrubaria a página.
+      dadosPaciente: {
+        nome: '',
+        telefone: '',
+        consentimentoLGPD: false,
+        ...prev.dadosPaciente,
+        [campo]: valor,
+      } as EstadoAgendamento['dadosPaciente'],
       erro: undefined,
     }))
   }
@@ -823,10 +832,11 @@ export function AbaAgendamento() {
 
   // 2.1 — "Confirmar agendamento" só ativa com nome e telefone válidos E o
   // checkbox de consentimento marcado. O servidor também recusa sem consentimento.
+  // (|| '' por segurança: um objeto parcial nunca derruba o render.)
   const dadosPacienteValidos =
     !!estado.dadosPaciente &&
-    estado.dadosPaciente.nome.trim().length >= 3 &&
-    estado.dadosPaciente.telefone.replace(/\D/g, '').length >= 10 &&
+    (estado.dadosPaciente.nome || '').trim().length >= 3 &&
+    (estado.dadosPaciente.telefone || '').replace(/\D/g, '').length >= 10 &&
     estado.dadosPaciente.consentimentoLGPD === true
 
   return (
