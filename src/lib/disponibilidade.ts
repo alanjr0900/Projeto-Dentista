@@ -26,20 +26,20 @@ export type PeriodoDisponibilidade = {
 }
 
 // Função auxiliar: converter HH:MM para minutos desde meia-noite
-function horarioParaMinutos(horario: string): number {
+export function horarioParaMinutos(horario: string): number {
   const [h, m] = horario.split(':').map(Number)
   return h * 60 + m
 }
 
 // Função auxiliar: converter minutos para HH:MM
-function minutosParaHorario(minutos: number): string {
+export function minutosParaHorario(minutos: number): string {
   const h = Math.floor(minutos / 60).toString().padStart(2, '0')
   const m = (minutos % 60).toString().padStart(2, '0')
   return `${h}:${m}`
 }
 
 // Função pura: gerar slots teóricos para um dia baseado no horário de funcionamento
-function gerarSlotsTeoricos(
+export function gerarSlotsTeoricos(
   data: Date,
   horarioFuncionamento: HorarioFuncionamento[],
   duracaoServico: number,
@@ -70,7 +70,7 @@ function gerarSlotsTeoricos(
 }
 
 // Função pura: verificar se um slot conflita com agendamentos existentes
-function slotConflitaComAgendamento(
+export function slotConflitaComAgendamento(
   slotInicio: Date,
   duracaoMin: number,
   agendamentos: { dataHora: Date; duracaoMin: number }[]
@@ -104,7 +104,7 @@ function slotConflitaComGoogle(
 }
 
 // Função pura: verificar se um slot cai em bloqueio
-function slotEmBloqueio(
+export function slotEmBloqueio(
   slotInicio: Date,
   duracaoMin: number,
   bloqueios: { inicio: Date; fim: Date; recorrente: boolean; diaSemana: number | null }[]

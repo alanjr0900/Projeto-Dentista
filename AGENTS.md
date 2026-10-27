@@ -84,6 +84,10 @@ src/app/(admin)/[adminPath]/
 
 - Ao alterar estruturas em `src/app/(admin)/`, rodar `npm run build`
   e `npx vitest run src/lib/enquadramento-editor.test.ts src/lib/rate-limit.test.ts`.
+- Antes de encerrar qualquer pacote de mudanças, rodar a suite COMPLETA:
+  `npx vitest run` (deve terminar sem falhas) — não considere "falhas pré-existentes"
+  como aceitáveis dentro do scope do próprio repositório: ou corrija o teste que
+  ficou desatualizado, ou documente o porquê no RESUMO.md.
 - Testes de navegador quando o fluxo de login/sessão mudar:
   1. Sem sessão: `/<ADMIN_PATH>` redireciona para o login; o HTML do login
      não contêm menu/título/subtítulo do painel.

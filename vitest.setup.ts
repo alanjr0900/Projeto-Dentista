@@ -21,8 +21,8 @@ vi.mock('next-auth/react', () => ({
 }))
 
 // Mock date-fns-tz
-vi.mock('date-fns-tz', () => ({
-  ...vi.importActual('date-fns-tz'),
+vi.mock('date-fns-tz', async () => ({
+  ...await vi.importActual('date-fns-tz'),
   formatInTimeZone: vi.fn((date, tz, fmt) => {
     const d = new Date(date)
     return d.toLocaleDateString('pt-BR', { timeZone: tz })

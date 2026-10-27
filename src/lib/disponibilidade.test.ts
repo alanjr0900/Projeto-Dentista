@@ -39,11 +39,11 @@ describe('Lógica de disponibilidade', () => {
     it('gera slots com intervalo padrão de 15 min', () => {
       const slots = gerarSlotsTeoricos(data, horarioFuncionamento, 60, 15)
       
-      // Manhã: 08:00 a 11:00 (4 slots de 60min com intervalo 15)
-      expect(slots.filter(s => s.horario.startsWith('08') || s.horario.startsWith('09') || s.horario.startsWith('10') || s.horario.startsWith('11'))).toHaveLength(4)
+      // Manhã: 08:00 a 12:00 → starts de 60min a cada 15min (08:00 a 11:00) = 13
+      expect(slots.filter(s => s.horario.startsWith('08') || s.horario.startsWith('09') || s.horario.startsWith('10') || s.horario.startsWith('11'))).toHaveLength(13)
       
-      // Tarde: 13:30 a 16:00 (3 slots)
-      expect(slots.filter(s => s.horario.startsWith('13') || s.horario.startsWith('14') || s.horario.startsWith('15') || s.horario.startsWith('16'))).toHaveLength(3)
+      // Tarde: 13:30 a 17:00 → starts 13:30 a 15:30 a cada 15min = 11
+      expect(slots.filter(s => s.horario.startsWith('13') || s.horario.startsWith('14') || s.horario.startsWith('15') || s.horario.startsWith('16'))).toHaveLength(11)
       
       expect(slots[0].horario).toBe('08:00')
       expect(slots[0].disponivel).toBe(true)
@@ -63,43 +63,46 @@ describe('Lógica de disponibilidade', () => {
   })
 
   describe('slotConflitaComAgendamento', () => {
+    // Datas com milissegundos zerados: sem isto, "borda exata" fica sujeita
+    // ao ms residual de new Date() e o teste é instável.
+    const dh = (h: number, m: number) => new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), h, m, 0, 0)
     const agendamentos = [
-      { dataHora: setMinutes(setHours(new Date(), 9), 0), duracaoMin: 60 }, // 09:00-10:00
-      { dataHora: setMinutes(setHours(new Date(), 14), 0), duracaoMin: 50 }, // 14:00-14:50
+      { dataHora: dh(9, 0), duracaoMin: 60 }, // 09:00-10:00
+      { dataHora: dh(14, 0), duracaoMin: 50 }, // 14:00-14:50
     ]
 
     it('detecta conflito exato', () => {
-      const slot = setMinutes(setHours(new Date(), 9), 0)
+      const slot = dh(9, 0)
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(true)
     })
 
     it('detecta sobreposição parcial no início', () => {
-      const slot = setMinutes(setHours(new Date()), 8, 30) // 08:30-09:30
+      const slot = dh(8, 30) // 08:30-09:30
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(true)
     })
 
     it('detecta sobreposição parcial no fim', () => {
-      const slot = setMinutes(setHours(new Date()), 9, 30) // 09:30-10:30
+      const slot = dh(9, 30) // 09:30-10:30
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(true)
     })
 
     it('detecta slot dentro do agendamento', () => {
-      const slot = setMinutes(setHours(new Date()), 9, 15) // 09:15-09:45
+      const slot = dh(9, 15) // 09:15-09:45
       expect(slotConflitaComAgendamento(slot, 30, agendamentos)).toBe(true)
     })
 
     it('não detecta conflito quando slot termina exatamente no início', () => {
-      const slot = setMinutes(setHours(new Date()), 8, 0) // 08:00-09:00
+      const slot = dh(8, 0) // 08:00-09:00
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(false)
     })
 
     it('não detecta conflito quando slot começa exatamente no fim', () => {
-      const slot = setMinutes(setHours(new Date()), 10, 0) // 10:00-11:00
+      const slot = dh(10, 0) // 10:00-11:00
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(false)
     })
 
     it('não detecta conflito em horários distantes', () => {
-      const slot = setMinutes(setHours(new Date()), 16, 0) // 16:00-17:00
+      const slot = dh(16, 0) // 16:00-17:00
       expect(slotConflitaComAgendamento(slot, 60, agendamentos)).toBe(false)
     })
   })

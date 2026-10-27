@@ -35,8 +35,18 @@ export type ConfiguracoesClinica = {
   limiteAgendamentosIpHora: number
 }
 
-// Cache das configurações para evitar múltiplas queries
-export const getConfiguracoes = cache(async (): Promise<ConfiguracoesClinica> => {
+// Cache das configurações para evitar múltiplas queries.
+// `cache` do React só existe no runtime do App Router (React Server); em
+// ambiente de teste (vitest/jsdom) ele não é função — usa fallback identidade.
+
+/**
+ * Envolve a função em cache do React quando disponível; caso contrário,
+ * devolve a própria função (sem cache), mantendo a mesma assinatura.
+ */
+const cacheDisponivel = (typeof cache === 'function' ? cache : <T extends (arg?: never) => unknown>(fn: T): T => fn) as
+  typeof cache
+
+export const getConfiguracoes = cacheDisponivel(async (): Promise<ConfiguracoesClinica> => {
   const configs = await prisma.configuracao.findMany()
   const mapa = Object.fromEntries(configs.map(c => [c.chave, c.valor]))
 

@@ -63,7 +63,7 @@ Build de produção OK (`npm run build` EXIT 0) e testes unitários estáveis 14
 
 ## 4. Pendências
 
-- Testes pré-existentes falhando (`disponibilidade.test.ts`, `AbaAgendamento.test.tsx`) — falhavam **antes** deste pacote; avaliar em outro momento.
+- ~~Testes pré-existentes falhando (`disponibilidade.test.ts`, `AbaAgendamento.test.tsx`)~~ **Corrigido (27/10, verificação independente)**: os 37 testes passam. Correções: testes chamavam `setHours` sem a hora e esperavam número de slots contra a semântica real (slots sobrepostos com intervalo < duração por design); trocado `vi.requireActual` (API Jest) por `vi.importActual`; `getConfiguracoes` agora usa fallback do React `cache` fora do App Router; `globals: true` no vitest (auto-cleanup do DOM); helpers puros de `disponibilidade.ts` exportados para os testes.
 - Testes E2E Playwright não executados (cobertura via build + vitest + verificação manual no navegador).
 - Quando o telefone/endereço mudar de novo: editar **somente** `src/lib/contato.ts`.
 - Aviso do dia de teste ficou gravado no banco (`aviso_do_dia` com `<b>` escapado) — limpar em Configurações > Informações do dia quando quiser.
