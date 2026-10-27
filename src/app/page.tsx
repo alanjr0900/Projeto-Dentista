@@ -5,6 +5,15 @@ import { WhatsAppFloat } from '@/components/layout/WhatsAppFloat'
 import { FotoDentista } from '@/components/FotoDentista'
 import { prisma } from '@/lib/prisma'
 import { getConfiguracoes } from '@/lib/config'
+import {
+  LINK_LIGAR,
+  TELEFONE_EXIBICAO,
+  ENDERECO,
+  MAPS_LINK,
+  MAPS_EMBED_SRC,
+  linkWhatsApp,
+  MENSAGEM_WHATSAPP_PADRAO,
+} from '@/lib/contato'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
@@ -23,7 +32,6 @@ export default async function HomePage() {
 
   // Nome curto para títulos: retira o tratamento "Dra. " se existir
   const primeiroNome = nome.replace(/^Dra\.?\s+/i, '').split(' ')[0] || nome
-  const endereco = cfg.clinicaEndereco?.trim()
 
   // Horários de funcionamento formatados por dia
   const horariosPorDia = DIAS.map((dia, i) => {
@@ -92,7 +100,7 @@ export default async function HomePage() {
                   </Link>
                   {cfg.clinicaWhatsApp && (
                     <a
-                      href={`https://wa.me/${cfg.clinicaWhatsApp}?text=${encodeURIComponent('Olá! Gostaria de informações sobre os atendimentos.')}`}
+                      href={linkWhatsApp('Olá! Gostaria de informações sobre os atendimentos.')}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn w-full px-8 py-4 text-lg text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 sm:w-auto"
@@ -208,28 +216,20 @@ export default async function HomePage() {
               </h2>
             </div>
 
+            {/* 1.3 — Contato (esquerda), mapa no meio, horários embaixo.
+                Desktop: 2 colunas (contato | mapa) e horários ocupando as duas;
+                Mobile: empilha na ordem contato → mapa → horários. */}
             <div className="mt-12 grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-              {/* Endereço e contatos */}
+              {/* Card de contato (sem endereço — ele fica no mapa abaixo) */}
               <address className="rounded-2xl bg-white p-8 shadow-soft border border-neutral-100 not-italic space-y-5">
-                <h3 className="font-heading text-lg font-semibold text-neutral-900">Endereço e contato</h3>
-                {endereco ? (
-                  <p className="flex items-start gap-3 text-neutral-700">
-                    <svg className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    {endereco}
-                  </p>
-                ) : (
-                  <p className="text-neutral-500">[Endereço a configurar no painel]</p>
-                )}
+                <h3 className="font-heading text-lg font-semibold text-neutral-900">Contato</h3>
                 {cfg.clinicaTelefone && (
                   <p className="flex items-center gap-3">
                     <svg className="w-5 h-5 text-primary-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
-                    <a href={`tel:+55${cfg.clinicaTelefone.replace(/\D/g, '')}`} className="text-neutral-700 hover:text-primary-600">
-                      {cfg.clinicaTelefone}
+                    <a href={LINK_LIGAR} className="text-neutral-700 hover:text-primary-600">
+                      {TELEFONE_EXIBICAO}
                     </a>
                   </p>
                 )}
@@ -239,7 +239,7 @@ export default async function HomePage() {
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.472.099-.174.05-.369-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.377-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.67-.297-.472-.404-.915-.57-1.384-.179-.486-.194-.585-.298-.694-.104-.124-.268-.239-.496-.375z" />
                     </svg>
                     <a
-                      href={`https://wa.me/${cfg.clinicaWhatsApp}?text=${encodeURIComponent('Olá! Gostaria de tirar uma dúvida.')}`}
+                      href={linkWhatsApp(MENSAGEM_WHATSAPP_PADRAO)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-neutral-700 hover:text-green-700"
@@ -253,6 +253,7 @@ export default async function HomePage() {
                     <svg className="w-5 h-5 text-primary-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
+                    {/* 1.1 — E-mail como link mailto: */}
                     <a href={`mailto:${cfg.clinicaEmail}`} className="text-neutral-700 hover:text-primary-600">
                       {cfg.clinicaEmail}
                     </a>
@@ -260,8 +261,31 @@ export default async function HomePage() {
                 )}
               </address>
 
-              {/* Horários de funcionamento */}
-              <div className="rounded-2xl bg-white p-8 shadow-soft border border-neutral-100">
+              {/* Mapa incorporado (entre os dois cards) + botão para abrir em nova aba */}
+              <div className="rounded-2xl bg-white p-6 shadow-soft border border-neutral-100 flex flex-col gap-4">
+                <iframe
+                  src={MAPS_EMBED_SRC}
+                  title={`Mapa do consultório — ${ENDERECO}`}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="w-full h-64 md:h-full min-h-64 flex-1 rounded-xl border-0"
+                />
+                <a
+                  href={MAPS_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline btn-full"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  Abrir no Google Maps
+                </a>
+              </div>
+
+              {/* Horários de funcionamento (abaixo dos dois, ocupando as 2 colunas) */}
+              <div className="md:col-span-2 rounded-2xl bg-white p-8 shadow-soft border border-neutral-100">
                 <h3 className="font-heading text-lg font-semibold text-neutral-900 mb-4">Horários de funcionamento</h3>
                 <table className="w-full text-sm">
                   <caption className="sr-only">Horários de funcionamento por dia da semana</caption>

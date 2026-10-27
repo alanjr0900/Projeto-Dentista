@@ -62,10 +62,26 @@ src/app/(admin)/[adminPath]/
     └── configuracoes/  # geral, horários, regras, foto
 ```
 
+## ☎️ Regra permanente 4 — Fonte única de telefone/endereço (src/lib/contato.ts)
+
+- Telefone/WhatsApp (`WHATSAPP_NUMERO`, `TELEFONE_EXIBICAO`) e endereço
+  (`ENDERECO`) vivem APENAS em `src/lib/contato.ts`. Nenhum outro arquivo
+  pode definir número ou endereço literal.
+- `src/lib/config.ts` sobrescreve `clinicaTelefone` / `clinicaWhatsApp` /
+  `clinicaEndereco` com os valores de `contato.ts` — mesmo que haja valores
+  antigos gravados no banco/painel para esses campos.
+- Links de WhatsApp usam `linkWhatsApp()` (wa.me com mensagem codificada);
+  ligação usa `LINK_LIGAR`; mapa usa `MAPS_LINK` / `MAPS_EMBED_SRC`.
+- PROIBIDO placeholder de telefone como `(XX) XXXX-XXXX` em qualquer arquivo.
+
+## 🗓️ Regra permanente 5 — Histórico do Git em commits por fase
+
+- (Substitui a regra antiga do histórico único.) Cada fase/pacote de melhorias
+  termina em um commit próprio com mensagem descritiva — sem amend em commits
+  anteriores e sem push forçado, salvo pedido explícito do responsável.
+
 ## 🛠️ Manutenção
 
-- Histórico do Git deve permanecer em **um único commit** (amend + push
-  forçado, conforme acordado com o responsável).
 - Ao alterar estruturas em `src/app/(admin)/`, rodar `npm run build`
   e `npx vitest run src/lib/enquadramento-editor.test.ts src/lib/rate-limit.test.ts`.
 - Testes de navegador quando o fluxo de login/sessão mudar:

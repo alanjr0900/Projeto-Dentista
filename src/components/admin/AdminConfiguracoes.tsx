@@ -237,7 +237,7 @@ export function AdminConfiguracoes({ configuracoes: configsIniciais }: AdminConf
               <h3 className="font-heading text-lg font-semibold text-neutral-900 pt-4 border-t border-neutral-200">Contato e Endereço</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <CampoInput label="Endereço completo" chave="clinica_endereco" valor={configs.clinica_endereco} onChange={handleChange} />
-                <CampoInput label="Telefone fixo" chave="clinica_telefone" valor={configs.clinica_telefone} onChange={handleChange} placeholder="(XX) XXXX-XXXX" />
+                <CampoInput label="Telefone fixo" chave="clinica_telefone" valor={configs.clinica_telefone} onChange={handleChange} placeholder="(11) 96407-4862" />
                 <CampoInput label="WhatsApp (somente números)" chave="clinica_whatsapp" valor={configs.clinica_whatsapp} onChange={handleChange} placeholder="55DDDNNNNNNNNN" />
                 <CampoInput label="E-mail" chave="clinica_email" valor={configs.clinica_email} onChange={handleChange} type="email" placeholder="contato@exemplo.com" />
               </div>

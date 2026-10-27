@@ -25,18 +25,18 @@ async function main() {
     },
     {
       chave: 'clinica_endereco',
-      valor: '[Endereço completo do consultório]',
-      descricao: 'Endereço completo para exibição e mapa',
+      valor: 'Avenida Pietro Petri, 601',
+      descricao: 'Endereço completo para exibição e mapa (fonte única: src/lib/contato.ts)',
     },
     {
       chave: 'clinica_telefone',
-      valor: '(XX) XXXX-XXXX',
-      descricao: 'Telefone fixo do consultório',
+      valor: '+55 11 96407-4862',
+      descricao: 'Telefone do consultório (fonte única: src/lib/contato.ts)',
     },
     {
       chave: 'clinica_whatsapp',
-      valor: '55XXXXXXXXXXX',
-      descricao: 'WhatsApp no formato 55DDDNNNNNNNNN (apenas números)',
+      valor: '5511964074862',
+      descricao: 'WhatsApp no formato 55DDDNNNNNNNNN (fonte única: src/lib/contato.ts)',
     },
     {
       chave: 'clinica_email',

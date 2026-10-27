@@ -360,7 +360,7 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
               value={telefoneFormatado}
               onChange={handleTelefoneChange}
               className="input pl-10"
-              placeholder="(XX) XXXXX-XXXX"
+              placeholder="(11) 96407-4862"
               required
               aria-required="true"
               maxLength={15}

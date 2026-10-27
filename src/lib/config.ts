@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { cache } from 'react'
+import { ENDERECO, TELEFONE_EXIBICAO, WHATSAPP_NUMERO } from './contato'
 
 // Tipos para configurações
 export type HorarioFuncionamento = {
@@ -55,9 +56,14 @@ export const getConfiguracoes = cache(async (): Promise<ConfiguracoesClinica> =>
 
   return {
     clinicaNome: mapa.clinica_nome || 'Consultório Odontológico',
-    clinicaEndereco: mapa.clinica_endereco || '',
-    clinicaTelefone: mapa.clinica_telefone || '',
-    clinicaWhatsApp: mapa.clinica_whatsapp || '',
+    /**
+     * TELEFONE/WHATSAPP/ENDEREÇO vêm de src/lib/contato.ts (fonte única,
+     * regra permanente). Os valores gravados no painel para estes campos
+     * são ignorados — assim não existe telefone desatualizado espalhado.
+     */
+    clinicaEndereco: ENDERECO,
+    clinicaTelefone: TELEFONE_EXIBICAO,
+    clinicaWhatsApp: WHATSAPP_NUMERO,
     clinicaEmail: mapa.clinica_email || '',
     dentistaNome: mapa.dentista_nome || 'Dra. Dentista',
     dentistaCRO: mapa.dentista_cro || 'CRO/UF XXXXX',
@@ -85,9 +91,10 @@ export async function invalidarCacheConfiguracoes() {
 // Configurações padrão para fallback (build time / SSR sem banco)
 export const CONFIG_PADRAO: ConfiguracoesClinica = {
   clinicaNome: 'Consultório Dra. [Nome da Dentista]',
-  clinicaEndereco: '[Endereço completo do consultório]',
-  clinicaTelefone: '(XX) XXXX-XXXX',
-  clinicaWhatsApp: '55XXXXXXXXXXX',
+  // Fonte única de contato (src/lib/contato.ts) — sem placeholders.
+  clinicaEndereco: ENDERECO,
+  clinicaTelefone: TELEFONE_EXIBICAO,
+  clinicaWhatsApp: WHATSAPP_NUMERO,
   clinicaEmail: 'contato@exemplo.com',
   dentistaNome: 'Dra. [Nome da Dentista]',
   dentistaCRO: 'CRO/UF XXXXX',

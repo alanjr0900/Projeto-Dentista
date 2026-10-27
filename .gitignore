@@ -35,3 +35,6 @@ Desktop.ini
 
 # Vercel
 .vercel
+
+# Backups locais do banco (dados de pacientes - LGPD: fora do repositorio)
+prisma/backup-*.db

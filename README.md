@@ -204,11 +204,17 @@ calendário. Requer SMTP:
 
 Todas as configurações podem ser alteradas em **Área Administrativa > Configurações** ou editando o arquivo `prisma/seed.ts` para valores padrão:
 
-- **Dados da clínica**: nome, endereço, telefone, WhatsApp, e-mail
+- **Dados da clínica**: nome e e-mail
 - **Dados da dentista**: nome, CRO, foto (URL)
 - **Horários de funcionamento**: por dia da semana, múltiplos períodos
 - **Regras de agendamento**: duração padrão, antecedência mínima, limite de dias, intervalo entre horários
 - **Serviços**: nome, descrição, duração, ordem, ativo/inativo
+
+> ☎️ **Telefone/WhatsApp e endereço estão em `src/lib/contato.ts`** (fonte
+> única, regra permanente — ver `AGENTS.md`). Os valores do banco/painel
+> para esses campos são ignorados em favor da fonte única — altere o número
+> ou o endereço APENAS nesse arquivo. Nenhum placeholder tipo `(XX) XXXX-XXXX`
+> deve existir no projeto.
 
 ### Textos e Identidade Visual
 
@@ -257,6 +263,7 @@ src/
 │   ├── disponibilidade.ts  # Lógica de slots (banco + bloqueios + Google)
 │   ├── validations.ts      # Schemas Zod
 │   ├── utils.ts            # Helpers (telefone, data, rate-limit)
+│   ├── contato.ts          # FONTE ÚNICA de telefone/WhatsApp/endereço/links (regra permanente)
 │   ├── ics.ts              # Geração de arquivo .ics
 │   └── whatsapp.ts         # Links WhatsApp com mensagem pré-preenchida
 ├── hooks/
