@@ -103,12 +103,42 @@ export async function POST(request: NextRequest) {
 
     // Criar agendamento em transação para evitar race condition
     const codigo = gerarCodigoAgendamento()
+    // 3.3 — Vincular/criar o paciente ANTES, para ligar o agendamento a ele
+    // (histórico da aba Pacientes) e registrar consentimento + 1º agendamento.
+    const telefoneDigitos = dados.telefone.replace(/\D/g, '')
+    const agora = new Date()
+    const datasAgendamento = new Date(`${dados.data}T${dados.horario}:00-03:00`)
+
+    const paciente = await prisma.paciente.upsert({
+      where: { telefone: telefoneDigitos },
+      update: {
+        nome: dados.nome,
+        email: dados.email || null,
+      },
+      create: {
+        nome: dados.nome,
+        telefone: telefoneDigitos,
+        email: dados.email || null,
+        consentimentoEm: agora,
+        primeiroAgendamentoEm: datasAgendamento,
+      },
+    })
+
+    // Preenche o que faltar (paciente antigo criado antes destes campos).
+    await prisma.paciente.updateMany({
+      where: { id: paciente.id, consentimentoEm: null },
+      data: { consentimentoEm: agora },
+    })
+    await prisma.paciente.updateMany({
+      where: { id: paciente.id, primeiroAgendamentoEm: null },
+      data: { primeiroAgendamentoEm: datasAgendamento },
+    })
     
     const agendamento = await prisma.$transaction(async (tx) => {
       // Verificar novamente dentro da transação (double-check)
       const conflito = await tx.agendamento.findFirst({
         where: {
-          dataHora: new Date(`${dados.data}T${dados.horario}:00-03:00`),
+          dataHora: datasAgendamento,
           status: { notIn: ['CANCELADO', 'FALTA'] },
         },
       })
@@ -120,30 +150,17 @@ export async function POST(request: NextRequest) {
         data: {
           codigo,
           servicoId: dados.servicoId,
-          dataHora: new Date(`${dados.data}T${dados.horario}:00-03:00`),
+          dataHora: datasAgendamento,
           duracaoMin: servico.duracaoMin,
+          pacienteId: paciente.id,
           pacienteNome: dados.nome,
-          pacienteTelefone: dados.telefone.replace(/\D/g, ''),
+          pacienteTelefone: telefoneDigitos,
           pacienteEmail: dados.email || null,
           observacoes: dados.observacoes || null,
           status: 'PENDENTE',
         },
         include: { servico: true },
       })
-    })
-
-    // Atualizar/criar paciente
-    await prisma.paciente.upsert({
-      where: { telefone: dados.telefone.replace(/\D/g, '') },
-      update: {
-        nome: dados.nome,
-        email: dados.email || null,
-      },
-      create: {
-        nome: dados.nome,
-        telefone: dados.telefone.replace(/\D/g, ''),
-        email: dados.email || null,
-      },
     })
 
     // ---- Integração Google Calendar (fonte dos horários livres) ----

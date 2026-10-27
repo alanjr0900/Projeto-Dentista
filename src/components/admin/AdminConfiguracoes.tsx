@@ -8,6 +8,8 @@ import { EditorFoto } from './EditorFoto'
 
 interface AdminConfiguracoesProps {
   configuracoes: Record<string, string>
+  /** 3.4 — Texto atual do "Informações do dia" (chave aviso_do_dia). */
+  avisoDoDiaInicial?: string
 }
 
 const DIAS_SEMANA = [
@@ -20,8 +22,14 @@ const DIAS_SEMANA = [
   { key: 'sab', label: 'Sábado', num: 6 },
 ]
 
-export function AdminConfiguracoes({ configuracoes: configsIniciais }: AdminConfiguracoesProps) {
+export function AdminConfiguracoes({ configuracoes: configsIniciais, avisoDoDiaInicial = '' }: AdminConfiguracoesProps) {
   const [configs, setConfigs] = useState(configsIniciais)
+  // 3.4 — Informações do dia (independente do formulário de configurações:
+  // usa a rota dedicada /api/admin/aviso-do-dia, que não mexe no resto).
+  const LIMITE_AVISO = 500
+  const [aviso, setAviso] = useState(avisoDoDiaInicial)
+  const [avisoMensagem, setAvisoMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const [avisoSalvando, setAvisoSalvando] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const [sucesso, setSucesso] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -47,6 +55,43 @@ export function AdminConfiguracoes({ configuracoes: configsIniciais }: AdminConf
 
   const handleChange = (chave: string, valor: string) => {
     setConfigs(prev => ({ ...prev, [chave]: valor }))
+  }
+
+  // 3.4 — Salva o texto do dia pela rota dedicada (não mexe nas demais configs).
+  const salvarAviso = async () => {
+    setAvisoSalvando(true)
+    setAvisoMensagem(null)
+    try {
+      const res = await fetch('/api/admin/aviso-do-dia', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aviso }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.erro || 'Erro ao salvar')
+      }
+      setAvisoMensagem({ tipo: 'ok', texto: 'Aviso salvo! Já aparece na página pública.' })
+    } catch (e) {
+      setAvisoMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao salvar o aviso' })
+    } finally {
+      setAvisoSalvando(false)
+    }
+  }
+
+  const limparAviso = async () => {
+    setAvisoSalvando(true)
+    setAvisoMensagem(null)
+    try {
+      const res = await fetch('/api/admin/aviso-do-dia', { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setAviso('')
+      setAvisoMensagem({ tipo: 'ok', texto: 'Aviso limpo. A página mostra "Nenhum aviso para hoje".' })
+    } catch {
+      setAvisoMensagem({ tipo: 'erro', texto: 'Erro ao limpar o aviso' })
+    } finally {
+      setAvisoSalvando(false)
+    }
   }
 
   const adicionarPeriodo = (dia: number) => {
@@ -240,6 +285,59 @@ export function AdminConfiguracoes({ configuracoes: configsIniciais }: AdminConf
                 <CampoInput label="Telefone fixo" chave="clinica_telefone" valor={configs.clinica_telefone} onChange={handleChange} placeholder="(11) 96407-4862" />
                 <CampoInput label="WhatsApp (somente números)" chave="clinica_whatsapp" valor={configs.clinica_whatsapp} onChange={handleChange} placeholder="55DDDNNNNNNNNN" />
                 <CampoInput label="E-mail" chave="clinica_email" valor={configs.clinica_email} onChange={handleChange} type="email" placeholder="contato@exemplo.com" />
+              </div>
+
+              {/*
+                3.4 — Informações do dia (texto puro). Endereço/telefone aqui
+                são apenas informativos: a exibição pública vem sempre de
+                src/lib/contato.ts (fonte única).
+              */}
+              <div className="pt-4 border-t border-neutral-200 space-y-2">
+                <h3 className="font-heading text-lg font-semibold text-neutral-900">Informações do dia</h3>
+                <p className="text-neutral-600 text-sm">
+                  Texto livre que aparece na página pública ao clicar em “Informações do dia”.
+                  Salve a cada atualização — vazio mostra “Nenhum aviso para hoje”.
+                </p>
+                <textarea
+                  value={aviso}
+                  onChange={e => {
+                    setAviso(e.target.value.slice(0, LIMITE_AVISO))
+                    setAvisoMensagem(null)
+                  }}
+                  onPaste={e => {
+                    // Colar também respeita o limite (contador fica correto).
+                    const colado = e.clipboardData.getData('text')
+                    if (aviso.length + colado.length > LIMITE_AVISO) {
+                      e.preventDefault()
+                      setAviso((aviso + colado).slice(0, LIMITE_AVISO))
+                      setAvisoMensagem({ tipo: 'erro', texto: `Máximo de ${LIMITE_AVISO} caracteres` })
+                    }
+                  }}
+                  maxLength={LIMITE_AVISO}
+                  rows={4}
+                  className="input min-h-[100px] resize-y"
+                  placeholder="Ex.: Hoje os atendimentos começam às 14h..."
+                  aria-label="Informações do dia"
+                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={cn('text-xs', aviso.length >= LIMITE_AVISO ? 'text-red-600' : 'text-neutral-500')} aria-live="polite">
+                    {aviso.length}/{LIMITE_AVISO} caracteres
+                  </span>
+                  <button type="button" onClick={salvarAviso} disabled={avisoSalvando} className="btn btn-primary btn-sm">
+                    {avisoSalvando ? 'Salvando...' : 'Salvar aviso'}
+                  </button>
+                  <button type="button" onClick={limparAviso} disabled={avisoSalvando} className="btn btn-secondary btn-sm">
+                    Limpar
+                  </button>
+                </div>
+                {avisoMensagem && (
+                  <p
+                    role="status"
+                    className={cn('text-sm', avisoMensagem.tipo === 'ok' ? 'text-green-700' : 'text-red-600')}
+                  >
+                    {avisoMensagem.texto}
+                  </p>
+                )}
               </div>
             </div>
           )}

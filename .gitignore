@@ -38,3 +38,6 @@ Desktop.ini
 
 # Backups locais do banco (dados de pacientes - LGPD: fora do repositorio)
 prisma/backup-*.db
+
+# scripts locais do responsavel
+start-local.ps1

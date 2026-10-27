@@ -13,5 +13,5 @@ export default async function ConfiguracoesPage() {
   const configuracoes = await prisma.configuracao.findMany()
   const mapa = Object.fromEntries(configuracoes.map(c => [c.chave, c.valor]))
 
-  return <AdminConfiguracoes configuracoes={mapa} />
+  return <AdminConfiguracoes configuracoes={mapa} avisoDoDiaInicial={mapa['aviso_do_dia'] || ''} />
 }

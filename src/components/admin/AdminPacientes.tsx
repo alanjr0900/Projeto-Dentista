@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -9,6 +9,12 @@ import { Agendamento, Paciente } from '@/types'
 type PacienteComHistorico = Paciente & {
   agendamentos: (Agendamento & { servico: { nome: string } })[]
   _count: { agendamentos: number }
+}
+
+type AnotacaoProntuario = {
+  id: string
+  texto: string
+  criadoEm: string | Date
 }
 
 interface AdminPacientesProps {
@@ -90,6 +96,94 @@ export function AdminPacientes({ pacientes: pacientesIniciais }: AdminPacientesP
   )
 }
 
+function ProntuarioDatado({ pacienteId }: { pacienteId: string }) {
+  const [notas, setNotas] = useState<AnotacaoProntuario[] | null>(null)
+  const [texto, setTexto] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  // Carrega as anotações ao abrir o painel do paciente.
+  useEffect(() => {
+    let ativo = true
+    setNotas(null)
+    fetch(`/api/admin/pacientes/${pacienteId}/prontuario`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then(data => { if (ativo) setNotas(Array.isArray(data) ? data : []) })
+      .catch(() => { if (ativo) setNotas([]) })
+    return () => { ativo = false }
+  }, [pacienteId])
+
+  const adicionarAnotacao = async () => {
+    if (!texto.trim() || salvando) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/admin/pacientes/${pacienteId}/prontuario`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto.trim() }),
+      })
+      if (!res.ok) throw new Error()
+      const nova = await res.json()
+      setNotas(prev => [nova, ...(prev || [])])
+      setTexto('')
+    } catch {
+      setErro('Erro ao salvar a anotação. Tente novamente.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div>
+      <h4 className="font-medium text-neutral-900 mb-2">Prontuário (anotações datadas)</h4>
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        <textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => {
+            // Ctrl+Enter salva sem sair do teclado.
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault()
+              adicionarAnotacao()
+            }
+          }}
+          className="input min-h-[64px] resize-y"
+          placeholder="Nova anotação (fica datada e preservada como histórico)..."
+          maxLength={2000}
+          aria-label="Nova anotação do prontuário"
+        />
+        <button
+          type="button"
+          onClick={adicionarAnotacao}
+          disabled={salvando || !texto.trim()}
+          className="btn btn-secondary self-start sm:self-auto shrink-0"
+        >
+          {salvando ? 'Salvando...' : 'Adicionar'}
+        </button>
+      </div>
+      {erro && <p className="text-sm text-red-600 mb-2" role="alert">{erro}</p>}
+
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {notas === null ? (
+          <p className="text-neutral-400 text-sm">Carregando anotações…</p>
+        ) : notas.length === 0 ? (
+          <p className="text-neutral-500 text-sm">Nenhuma anotação datada ainda.</p>
+        ) : (
+          notas.map(nota => (
+            <div key={nota.id} className="p-3 rounded-lg bg-white border border-neutral-200">
+              <time className="text-xs text-neutral-500">
+                {format(new Date(nota.criadoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+              </time>
+              <p className="text-sm text-neutral-700 whitespace-pre-line mt-1">{nota.texto}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PacienteRow({ 
   paciente, 
   expandido, 
@@ -150,6 +244,27 @@ function PacienteRow({
           <div className="grid gap-6 md:grid-cols-3">
             {/* Informações */}
             <div className="md:col-span-2 space-y-4">
+              {/* Cadastro (3.3): e-mail, consentimento LGPD e 1º agendamento */}
+              <div className="card-padded bg-white border border-neutral-200 space-y-2 text-sm">
+                <h4 className="font-medium text-neutral-900">Cadastro</h4>
+                <p className="text-neutral-600">
+                  <span className="font-medium text-neutral-800">Telefone:</span> {formatarTelefone(paciente.telefone)}
+                  {paciente.email && <> · <span className="font-medium text-neutral-800">E-mail:</span> {paciente.email}</>}
+                </p>
+                <p className="text-neutral-600">
+                  <span className="font-medium text-neutral-800">Consentimento:</span>{' '}
+                  {paciente.consentimentoEm
+                    ? format(new Date(paciente.consentimentoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+                    : 'não registrado'}
+                </p>
+                <p className="text-neutral-600">
+                  <span className="font-medium text-neutral-800">Primeiro agendamento pelo site:</span>{' '}
+                  {paciente.primeiroAgendamentoEm
+                    ? format(new Date(paciente.primeiroAgendamentoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+                    : 'não registrado'}
+                </p>
+              </div>
+
               <div>
                 <h4 className="font-medium text-neutral-900 mb-2">Anotações internas</h4>
                 <textarea
@@ -199,6 +314,9 @@ function PacienteRow({
                   )}
                 </div>
               </div>
+
+              {/* Prontuário com anotações datadas (3.3) */}
+              <ProntuarioDatado pacienteId={paciente.id} />
             </div>
 
             {/* Resumo */}

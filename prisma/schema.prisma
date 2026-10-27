@@ -73,15 +73,32 @@ model Configuracao {
 }
 
 model Paciente {
-  id           String        @id @default(cuid())
-  nome         String
-  telefone     String        @unique
-  email        String?
-  anotacoes    String?
-  criadoEm     DateTime      @default(now())
-  atualizadoEm DateTime      @updatedAt
-  agendamentos Agendamento[]
+  id                    String             @id @default(cuid())
+  nome                  String
+  telefone              String             @unique
+  email                 String?
+  anotacoes             String?
+  // Consentimento LGPD registrado com data/hora no primeiro agendamento.
+  consentimentoEm       DateTime?
+  // Momento do primeiro agendamento feito pelo site (base da ordem cronológica).
+  primeiroAgendamentoEm DateTime?
+  anotacoesProntuario   AnotacaoPaciente[]
+  criadoEm              DateTime           @default(now())
+  atualizadoEm          DateTime           @updatedAt
+  agendamentos          Agendamento[]
 
   @@index([telefone])
   @@index([nome])
+}
+
+// Prontuário do paciente: anotações DATADAS da dentista. Cada nota nova é
+// uma linha preservando o histórico (diferente do campo livre `anotacoes`).
+model AnotacaoPaciente {
+  id         String   @id @default(cuid())
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  texto      String
+  criadoEm   DateTime @default(now())
+
+  @@index([pacienteId, criadoEm])
 }

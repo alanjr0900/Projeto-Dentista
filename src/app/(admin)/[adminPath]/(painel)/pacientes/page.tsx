@@ -15,11 +15,19 @@ export default async function PacientesPage() {
       agendamentos: {
         include: { servico: true },
         orderBy: { dataHora: 'desc' },
-        take: 5,
+        take: 50,
       },
       _count: { select: { agendamentos: true } },
     },
-    orderBy: { atualizadoEm: 'desc' },
+  })
+
+  // 3.3 — Ordem cronológica a partir do primeiro agendamento pelo site.
+  // Pacientes que ainda não têm primeiro agendamento ficam no fim.
+  pacientes.sort((a, b) => {
+    const ta = a.primeiroAgendamentoEm ? new Date(a.primeiroAgendamentoEm).getTime() : Infinity
+    const tb = b.primeiroAgendamentoEm ? new Date(b.primeiroAgendamentoEm).getTime() : Infinity
+    if (ta !== tb) return ta - tb
+    return a.nome.localeCompare(b.nome, 'pt-BR')
   })
 
   return <AdminPacientes pacientes={pacientes} />
