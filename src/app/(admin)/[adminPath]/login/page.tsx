@@ -22,6 +22,7 @@ export default function LoginPage() {
   const error = searchParams.get('error')
 
   const [senha, setSenha] = useState('')
+  const [mostrarSenha, setMostrarSenha] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(error ? 'Senha incorreta. Tente novamente.' : null)
 
@@ -87,23 +88,47 @@ export default function LoginPage() {
               <label htmlFor="senha" className="label">Senha de acesso</label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={mostrarSenha ? 'text' : 'password'}
                   id="senha"
                   name="senha"
                   autoComplete="current-password"
                   value={senha}
                   onChange={e => setSenha(e.target.value)}
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="••••••••"
                   required
                   disabled={carregando}
                 />
+                {/* Cadeado fixo à esquerda (com padding para o texto não encostar) */}
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" aria-hidden="true">
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </span>
+                {/* 3.6 — Botão de olho à direita: alterna mostrar/ocultar. */}
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-pressed={mostrarSenha}
+                  title={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  {mostrarSenha ? (
+                    /* Olho riscado quando a senha está visível */
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                      <line x1="2" y1="2" x2="22" y2="22" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
 
