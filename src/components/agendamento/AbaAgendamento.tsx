@@ -821,6 +821,14 @@ export function AbaAgendamento() {
   const passos: PassoAgendamento[] = ['servico', 'data', 'horario', 'dados', 'confirmacao']
   const passoAtualIndex = passos.indexOf(estado.passoAtual)
 
+  // 2.1 — "Confirmar agendamento" só ativa com nome e telefone válidos E o
+  // checkbox de consentimento marcado. O servidor também recusa sem consentimento.
+  const dadosPacienteValidos =
+    !!estado.dadosPaciente &&
+    estado.dadosPaciente.nome.trim().length >= 3 &&
+    estado.dadosPaciente.telefone.replace(/\D/g, '').length >= 10 &&
+    estado.dadosPaciente.consentimentoLGPD === true
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Indicador de progresso */}
@@ -978,8 +986,14 @@ export function AbaAgendamento() {
               <button onClick={passoAnterior} className="btn btn-secondary" disabled={carregando}>Voltar</button>
               <button 
                 onClick={handleConfirmar} 
-                className="btn btn-primary" 
-                disabled={carregando}
+                className={cn(
+                  'btn btn-primary',
+                  !dadosPacienteValidos && 'opacity-40 cursor-not-allowed'
+                )}
+                disabled={carregando || !dadosPacienteValidos}
+                title={dadosPacienteValidos
+                  ? undefined
+                  : 'Preencha nome, telefone e marque o consentimento para ativar'}
               >
                 {carregando ? (
                   <span className="flex items-center gap-2">
