@@ -189,6 +189,17 @@ button {
   @apply px-4 py-2.5 text-sm;
 }
 
+/* Botão do header: tamanho btn-sm a partir de 640px e compacto no celular */
+.btn-compact {
+  @apply px-4 py-2.5 text-sm;
+}
+
+@media (max-width: 639px) {
+  .btn-compact {
+    @apply px-2.5 py-2 text-xs;
+  }
+}
+
 .btn-lg {
   @apply px-8 py-4 text-lg;
 }
