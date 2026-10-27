@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface InformacoesDoDiaModalProps {
   aberto: boolean
@@ -12,11 +13,17 @@ interface InformacoesDoDiaModalProps {
  * Busca o texto na rota pública SOMENTE-LEITURA /api/aviso-do-dia e
  * renderiza como TEXTO PURO (React escapa por padrão — nunca HTML do
  * usuário). Fecha por botão X, tecla Esc e clique fora do cartão.
+ *
+ * O modal é renderizado em um portal no <body>: dentro do <header> ele
+ * herdaria o contexto de empilhamento (e o `backdrop-filter` do header,
+ * que vira bloco contentor de elementos `fixed`), ficando preso no topo.
  */
 export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModalProps) {
   const [aviso, setAviso] = useState<string | null>(null)
   const [erro, setErro] = useState(false)
   const refCartao = useRef<HTMLDivElement>(null)
+  const refBotaoFechar = useRef<HTMLButtonElement>(null)
+  const refFocoAnterior = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!aberto) return
@@ -45,21 +52,50 @@ export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModa
     }
   }, [aberto, onFechar])
 
-  if (!aberto) return null
+  // Trava a rolagem da página enquanto o modal estiver aberto.
+  useEffect(() => {
+    if (!aberto) return
+    const html = document.documentElement
+    const overflowHtml = html.style.overflow
+    const overflowBody = document.body.style.overflow
+    html.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = overflowHtml
+      document.body.style.overflow = overflowBody
+    }
+  }, [aberto])
 
-  return (
+  // Foco vai para o botão de fechar ao abrir e volta ao elemento anterior ao fechar.
+  useEffect(() => {
+    if (!aberto) {
+      refFocoAnterior.current?.focus?.()
+      refFocoAnterior.current = null
+      return
+    }
+    refFocoAnterior.current = document.activeElement as HTMLElement | null
+    refBotaoFechar.current?.focus()
+  }, [aberto])
+
+  if (!aberto || typeof document === 'undefined') return null
+
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-[6px] p-4 sm:p-6 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label="Informações do dia"
-      onClick={e => {
-        // Clique fora do cartão fecha.
+      onMouseDown={e => {
+        // Clique fora do cartão (na máscara) fecha.
         if (!refCartao.current?.contains(e.target as Node)) onFechar()
       }}
     >
-      <div ref={refCartao} className="card-padded w-full max-w-md relative bg-white rounded-2xl shadow-soft">
+      <div
+        ref={refCartao}
+        className="card-padded relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col bg-white rounded-2xl shadow-soft sm:max-h-[calc(100dvh-3rem)]"
+      >
         <button
+          ref={refBotaoFechar}
           type="button"
           onClick={onFechar}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
@@ -73,7 +109,7 @@ export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModa
 
         <h2 className="font-heading text-xl font-semibold text-neutral-900 pr-8">Informações do dia</h2>
 
-        <div className="mt-4 text-neutral-700 leading-relaxed whitespace-pre-line">
+        <div className="mt-4 min-h-0 overflow-y-auto text-neutral-700 leading-relaxed whitespace-pre-line">
           {erro ? (
             <p className="text-neutral-500">Não foi possível carregar as informações. Tente novamente.</p>
           ) : aviso === null ? (
@@ -88,4 +124,6 @@ export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModa
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
