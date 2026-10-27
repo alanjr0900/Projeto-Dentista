@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { WhatsAppFloat } from '@/components/layout/WhatsAppFloat'
@@ -69,15 +70,14 @@ export default async function HomePage() {
           <div className="container-pad">
             <div className="grid items-center gap-10 py-12 lg:grid-cols-2 lg:gap-16 lg:py-20">
               <div className="text-center lg:text-left">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-sm font-medium text-primary-700 shadow-sm mb-6">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  Odontologia humanizada
-                </span>
+                <Image
+                  src="/logo/logo-simbolo.png"
+                  alt="Símbolo da Dra. Luciana Ripa"
+                  width={310}
+                  height={300}
+                  priority
+                  className="mb-6 block h-auto w-16 sm:w-20 lg:w-[88px]"
+                />
                 <h1 id="hero-titulo" className="font-heading text-4xl font-bold text-neutral-900 sm:text-5xl">
                   {nome}
                 </h1>
