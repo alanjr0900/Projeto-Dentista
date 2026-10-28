@@ -213,6 +213,17 @@ button {
   @apply w-full px-4 py-3.5 rounded-xl border border-neutral-300 bg-white text-base-lg transition-all duration-200 placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed;
 }
 
+/* Reserva de espaço para ícone dentro do input.
+   O `px-4` do `.input` vem depois das utilities e vence `pl-10`/`pr-10`,
+   então o padding dos ícones precisa morar aqui (após `.input`). */
+.input-icone-esq {
+  padding-left: 46px; /* ícone em left-3 (12px) + 20px = 32px, +14px de respiro */
+}
+
+.input-icone-dir {
+  padding-right: 46px; /* botão em right-2 (8px) + 32px = 40px, +6px de respiro */
+}
+
 .input-error {
   @apply border-red-400 focus-visible:ring-red-400;
 }
