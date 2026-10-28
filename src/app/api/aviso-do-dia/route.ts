@@ -6,7 +6,12 @@ import { prisma } from '@/lib/prisma'
  * Devolve apenas o texto livre "Informações do dia" gravado no painel.
  * Nada de HTML é interpretado: o cliente renderiza o texto como conteúdo
  * de texto puro (React escapa por padrão).
+ *
+ * `force-dynamic`: sem isso o Next pré-renderiza o GET no build e o site
+ * ficaria preso ao texto antigo, ignorando tudo que a doutora grava depois.
  */
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const registro = await prisma.configuracao.findUnique({

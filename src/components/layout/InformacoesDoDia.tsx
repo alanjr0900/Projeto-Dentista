@@ -1,26 +1,30 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 interface InformacoesDoDiaModalProps {
   aberto: boolean
+  /** Texto atual vindo do Header (null = ainda carregando). */
+  aviso: string | null
+  /** True quando a busca em /api/aviso-do-dia falhou. */
+  erro: boolean
   onFechar: () => void
 }
 
 /**
  * 1.5 — Modal do "Informações do dia".
- * Busca o texto na rota pública SOMENTE-LEITURA /api/aviso-do-dia e
- * renderiza como TEXTO PURO (React escapa por padrão — nunca HTML do
- * usuário). Fecha por botão X, tecla Esc e clique fora do cartão.
+ * O texto é buscado/monitorado pelo Header (rota pública SOMENTE-LEITURA
+ * /api/aviso-do-dia) e chega por props, então o modal sempre mostra a
+ * versão mais recente gravada no painel. Renderiza como TEXTO PURO
+ * (React escapa por padrão — nunca HTML do usuário). Fecha por botão X,
+ * tecla Esc e clique fora do cartão.
  *
  * O modal é renderizado em um portal no <body>: dentro do <header> ele
  * herdaria o contexto de empilhamento (e o `backdrop-filter` do header,
  * que vira bloco contentor de elementos `fixed`), ficando preso no topo.
  */
-export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModalProps) {
-  const [aviso, setAviso] = useState<string | null>(null)
-  const [erro, setErro] = useState(false)
+export function InformacoesDoDiaModal({ aberto, aviso, erro, onFechar }: InformacoesDoDiaModalProps) {
   const refCartao = useRef<HTMLDivElement>(null)
   const refBotaoFechar = useRef<HTMLButtonElement>(null)
   const refFocoAnterior = useRef<HTMLElement | null>(null)
@@ -28,28 +32,12 @@ export function InformacoesDoDiaModal({ aberto, onFechar }: InformacoesDoDiaModa
   useEffect(() => {
     if (!aberto) return
 
-    // Busca o aviso só quando o modal abre (texto fica sempre atualizado).
-    let ativo = true
-    setAviso(null)
-    setErro(false)
-    fetch('/api/aviso-do-dia', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error('erro'))))
-      .then(data => {
-        if (ativo) setAviso(typeof data.aviso === 'string' ? data.aviso : '')
-      })
-      .catch(() => {
-        if (ativo) setErro(true)
-      })
-
     // Esc fecha.
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onFechar()
     }
     document.addEventListener('keydown', aoTeclar)
-    return () => {
-      ativo = false
-      document.removeEventListener('keydown', aoTeclar)
-    }
+    return () => document.removeEventListener('keydown', aoTeclar)
   }, [aberto, onFechar])
 
   // Trava a rolagem da página enquanto o modal estiver aberto.

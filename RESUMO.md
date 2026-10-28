@@ -12,7 +12,9 @@ Build de produção OK (`npm run build` EXIT 0) e testes unitários estáveis 14
   - Fonte única de contato: novo **`src/lib/contato.ts`** (regra permanente 4 em `AGENTS.md`) — `WHATSAPP_NUMERO=5511964074862`, `TELEFONE_EXIBICAO=+55 11 96407-4862`, `ENDERECO=Avenida Pietro Petri, 601`, `LINK_LIGAR`, `linkWhatsApp()`, `MAPS_LINK`, `MAPS_EMBED_SRC`.
   - `getConfiguracoes` sobrescreve telefone/WhatsApp/endereço com `contato.ts` (valores antigos do painel/banco são ignorados). Sem placeholders `(XX) XXXX-XXXX` em lugar nenhum.
 - **1.4** Botão flutuante de WhatsApp com o **SVG oficial** e `aria-label="Falar pelo WhatsApp"`.
-- **1.5** Botão **"Informações do dia"** no header (desktop) e ícone compacto no mobile; abre modal que busca `/api/aviso-do-dia` (rota pública somente-leitura) e fecha por X, Esc e clique fora.
+- **1.5** Botão **"Informações do dia"** no header (desktop e mobile); abre modal que busca `/api/aviso-do-dia` (rota pública somente-leitura) e fecha por X, Esc e clique fora.
+  - **Aviso automático**: ao carregar uma página pública o site busca a mensagem atual e, se não estiver vazia, abre o modal sozinho (mesma máscara desfocada). Texto vazio → nada aparece. Após fechar, **não reabre** até recarregar a página ou a doutora trocar o texto (registro numa variável de módulo, que zera a cada reload); trocas são percebidas a cada 30s e ao voltar para a aba. O botão do header continua abrindo normalmente, sempre com a versão mais recente.
+  - `/api/aviso-do-dia` agora é **`force-dynamic`**: sem isso o Next pré-renderizava o GET no build e o público ficaria preso ao texto antigo, ignorando tudo que o painel gravasse depois.
 
 ### Fase B — Consentimento no agendamento (2.1) (commit 6c67180)
 - Botão **"Confirmar agendamento"** só ativa com nome ≥ 3 caracteres, telefone ≥ 10 dígitos **e** consentimento marcado (`disabled` + `opacity-40` + `title` explicativo).
