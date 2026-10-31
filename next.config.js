@@ -27,6 +27,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // outputFileTracing foi movido do experimental para o nível superior em Next 14.2.5
+  outputFileTracing: false,
   images: {
     remotePatterns: [
       {
@@ -45,9 +47,6 @@ const nextConfig = {
     workerThreads: false,
     // Pacotes grandes ficam fora do bundle do servidor (build mais leve).
     serverComponentsExternalPackages: ['googleapis', '@prisma/client', 'nodemailer', 'bcryptjs'],
-    // Não precisamos de tracing de arquivos (não usamos output: standalone).
-    // Isso evita uma etapa pesada no fim do build em VPS pequena.
-    outputFileTracing: false,
     serverActions: {
       bodySizeLimit: '2mb',
     },

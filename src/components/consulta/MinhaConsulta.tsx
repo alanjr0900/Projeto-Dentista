@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn, formatarDataBR, formatarHoraBR } from '@/lib/utils'
+import { DATA_NASCIMENTO_MAX } from '@/lib/data-nascimento'
 
 type Prazos = {
   podeRemarcar: boolean
@@ -72,12 +73,41 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
   const [email, setEmail] = useState('')
   const [codigo, setCodigo] = useState('')
   const [passo, setPasso] = useState<'email' | 'codigo'>('email')
+  const [modoAcesso, setModoAcesso] = useState<'email' | 'codigo'>('email')
   const [enviando, setEnviando] = useState(false)
   const [validando, setValidando] = useState(false)
   const [erroLogin, setErroLogin] = useState<string | null>(null)
   const [avisoLogin, setAvisoLogin] = useState<string | null>(null)
   const [segundosReenvio, setSegundosReenvio] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Acesso alternativo por código de agendamento (sem e-mail).
+  const [codigoAgendamento, setCodigoAgendamento] = useState('')
+  const [dataNascimento, setDataNascimento] = useState('')
+  const [telefone, setTelefone] = useState('')
+  const [telefoneFormatado, setTelefoneFormatado] = useState('')
+
+  const alterarTelefoneAcesso = (valor: string) => {
+    const digitos = valor.replace(/\D/g, '')
+    let formatado = ''
+    if (digitos.length <= 2) formatado = `(${digitos}`
+    else if (digitos.length <= 7) formatado = `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`
+    else if (digitos.length <= 11) formatado = `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`
+    else formatado = `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7, 11)}`
+    setTelefoneFormatado(formatado)
+    setTelefone(digitos)
+  }
+
+  const trocarModoAcesso = (modo: 'email' | 'codigo') => {
+    setModoAcesso(modo)
+    setErroLogin(null)
+    setAvisoLogin(null)
+    setSegundosReenvio(0)
+    if (modo === 'email') {
+      setPasso('email')
+      setCodigo('')
+    }
+  }
 
   // Painel do paciente
   const [agendamentoId, setAgendamentoId] = useState<string | null>(null)
@@ -105,6 +135,7 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
 
   const tratarSessaoExpirada = useCallback(() => {
     setPaciente(null)
+    setModoAcesso('email')
     setPasso('email')
     setCodigo('')
     setAvisoLogin(null)
@@ -186,7 +217,7 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
 
   const pedirCodigo = async (event?: React.FormEvent) => {
     event?.preventDefault()
-    if (enviando) return
+    if (enviando || modoAcesso !== 'email') return
 
     setEnviando(true)
     setErroLogin(null)
@@ -220,7 +251,7 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
 
   const validarCodigo = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (validando) return
+    if (validando || modoAcesso !== 'email') return
 
     setValidando(true)
     setErroLogin(null)
@@ -256,6 +287,55 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
     }
   }
 
+  const entrarPorCodigo = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (validando) return
+
+    const codigoInformado = codigoAgendamento.trim().toUpperCase()
+    if (codigoInformado.length < 6) {
+      setErroLogin('Informe o código do agendamento.')
+      return
+    }
+
+    setValidando(true)
+    setErroLogin(null)
+
+    try {
+      const resposta = await fetch('/api/paciente/email/entrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo: codigoInformado,
+          dataNascimento,
+          telefone,
+        }),
+      })
+      const dados = await resposta.json().catch(() => ({}))
+
+      if (!resposta.ok) {
+        setErroLogin(dados.erro || 'Dados não conferem.')
+        return
+      }
+
+      const abriu = await carregarSessao()
+      if (!abriu) {
+        setErroLogin('Não foi possível abrir sua sessão. Tente novamente.')
+        return
+      }
+
+      setModoAcesso('email')
+      setPasso('email')
+      setCodigo('')
+      setAvisoLogin(null)
+      setSegundosReenvio(0)
+      setMensagem({ tipo: 'sucesso', texto: 'Acesso liberado. Que bom ter você por aqui!' })
+    } catch {
+      setErroLogin('Não foi possível validar o código. Tente novamente.')
+    } finally {
+      setValidando(false)
+    }
+  }
+
   const sair = async () => {
     try {
       await fetch('/api/paciente/email/logout', { method: 'POST' })
@@ -263,6 +343,7 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
       // Mesmo se a rede falhar, limpamos a tela local.
     }
     setPaciente(null)
+    setModoAcesso('email')
     setPasso('email')
     setCodigo('')
     setErroLogin(null)
@@ -426,9 +507,11 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
               Acesse sua consulta
             </h2>
             <p className="mt-2 text-sm text-neutral-600">
-              {passo === 'email'
-                ? 'Informe o e-mail cadastrado para receber um código de acesso.'
-                : `Digite o código de 6 dígitos enviado para ${email}.`}
+              {modoAcesso === 'codigo'
+                ? 'Informe o código do seu agendamento junto com a data de nascimento e o telefone.'
+                : passo === 'email'
+                  ? 'Informe o e-mail cadastrado para receber um código de acesso.'
+                  : `Digite o código de 6 dígitos enviado para ${email}.`}
             </p>
           </div>
 
@@ -450,7 +533,114 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
             </div>
           )}
 
-          {passo === 'email' ? (
+          <div
+            className="flex rounded-xl border border-neutral-200 bg-neutral-50 p-1"
+            role="tablist"
+            aria-label="Como você quer acessar"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoAcesso === 'email'}
+              onClick={() => trocarModoAcesso('email')}
+              className={cn(
+                'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                modoAcesso === 'email'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-700'
+              )}
+            >
+              E-mail
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoAcesso === 'codigo'}
+              onClick={() => trocarModoAcesso('codigo')}
+              className={cn(
+                'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                modoAcesso === 'codigo'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-700'
+              )}
+            >
+              Código de agendamento
+            </button>
+          </div>
+
+          {modoAcesso === 'codigo' ? (
+            <form onSubmit={entrarPorCodigo} className="space-y-4">
+              <div className="form-group">
+                <label htmlFor="codigoAgendamento" className="label">
+                  Código do agendamento
+                </label>
+                <input
+                  type="text"
+                  id="codigoAgendamento"
+                  required
+                  value={codigoAgendamento}
+                  onChange={event => setCodigoAgendamento(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  className="input text-center font-mono text-2xl tracking-[0.5em]"
+                  placeholder="ABC234"
+                  maxLength={40}
+                  autoFocus
+                />
+                <p className="mt-2 text-xs text-neutral-500">
+                  O código é enviado pela dentista no WhatsApp ou na confirmação do agendamento.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="dataNascimentoAcesso" className="label">
+                  Data de nascimento
+                </label>
+                <input
+                  type="date"
+                  id="dataNascimentoAcesso"
+                  required
+                  value={dataNascimento}
+                  onChange={event => setDataNascimento(event.target.value)}
+                  className="input"
+                  max={DATA_NASCIMENTO_MAX}
+                  autoComplete="bday"
+                />
+                <p className="mt-2 text-xs text-neutral-500">
+                  Confirme sua data de nascimento para validar o acesso.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="telefoneAcesso" className="label">
+                  Telefone
+                </label>
+                <input
+                  type="tel"
+                  id="telefoneAcesso"
+                  required
+                  value={telefoneFormatado}
+                  onChange={event => alterarTelefoneAcesso(event.target.value)}
+                  className="input"
+                  placeholder="(11) 96407-4862"
+                  maxLength={15}
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+                <p className="mt-2 text-xs text-neutral-500">
+                  Confira com o telefone cadastrado para a sua consulta.
+                </p>
+              </div>
+
+              <button type="submit" disabled={validando || codigoAgendamento.trim().length < 6} className="btn btn-primary w-full">
+                {validando ? 'Validando...' : 'Entrar'}
+              </button>
+
+              <div className="text-center">
+                <button type="button" onClick={() => trocarModoAcesso('email')} className="text-xs text-neutral-500 hover:text-neutral-700">
+                  Trocar para o e-mail
+                </button>
+              </div>
+            </form>
+          ) : passo === 'email' ? (
             <form onSubmit={pedirCodigo} className="space-y-4">
               <div className="form-group">
                 <label htmlFor="email" className="label">

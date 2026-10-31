@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
+import ServiceIcon from '@/components/shared/ServiceIcon'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PassoAgendamento, EstadoAgendamento, Servico } from '@/types'
 import { formatarDataBR, formatarHoraBR, formatarTelefone } from '@/lib/utils'
+import { DATA_NASCIMENTO_MAX } from '@/lib/data-nascimento'
 
 // Tipos para os componentes
 interface ServicoCardProps {
@@ -40,6 +41,7 @@ interface ConfirmacaoProps {
   agendamento: EstadoAgendamento['agendamentoConfirmado']
   onAdicionarCalendario: () => void
   onWhatsApp: () => void
+  onEnviarCodigo: () => void
   onNovoAgendamento: () => void
 }
 
@@ -58,27 +60,12 @@ function ServicoCard({ servico, selecionado, onClick }: ServicoCardProps) {
       aria-pressed={selecionado}
     >
       <div className="flex items-start gap-4">
-        <div className={cn(
-          'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-          selecionado ? 'bg-primary-600 text-white' : 'bg-primary-100 text-primary-600'
-        )}>
-          <Image
-            src="/logo/logo-simbolo.png"
-            alt="Símbolo da Dra. Luciana Ripa"
-            width={310}
-            height={300}
-            className={cn('h-7 w-auto object-contain sm:h-8', selecionado && 'brightness-0 invert')}
-          />
-        </div>
+        <ServiceIcon selected={selecionado} />
         <div className="flex-1 min-w-0">
           <h3 className="font-heading text-lg font-semibold text-neutral-900">{servico.nome}</h3>
           <p className="text-sm text-neutral-600 mt-1 line-clamp-2">{servico.descricao}</p>
           <div className="flex items-center gap-3 mt-3">
             <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
               {servico.duracaoMin} min
             </span>
           </div>
@@ -318,14 +305,7 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
       {/* Resumo do agendamento */}
       <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600" aria-hidden="true">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </div>
+          <ServiceIcon className="w-10 h-10" />
           <div>
             <p className="font-medium text-neutral-900">{servicoNome}</p>
             <p className="text-sm text-neutral-600">{dataHora}</p>
@@ -378,7 +358,7 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
         </div>
 
         <div className="form-group">
-          <label htmlFor="dataNascimento" className="label">Data de nascimento (opcional)</label>
+          <label htmlFor="dataNascimento" className="label">Data de nascimento *</label>
           <input
             type="date"
             id="dataNascimento"
@@ -387,10 +367,12 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
             value={dados?.dataNascimento || ''}
             onChange={e => onChange('dataNascimento', e.target.value)}
             className="input"
-            max={new Date().toISOString().slice(0, 10)}
+            max={DATA_NASCIMENTO_MAX}
+            required
+            aria-required="true"
           />
           <p className="text-xs text-neutral-500 mt-1">
-            Ajuda a confirmar sua identidade em &quot;Minha consulta&quot;, junto com o código.
+            Obrigatória para confirmar sua identidade em &quot;Minha consulta&quot;, junto com o código.
           </p>
         </div>
 
@@ -457,7 +439,7 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
 }
 
 // Confirmação
-function Confirmacao({ agendamento, onAdicionarCalendario, onWhatsApp, onNovoAgendamento }: ConfirmacaoProps) {
+function Confirmacao({ agendamento, onAdicionarCalendario, onWhatsApp, onEnviarCodigo, onNovoAgendamento }: ConfirmacaoProps) {
   if (!agendamento) return null
 
   return (
@@ -507,7 +489,7 @@ function Confirmacao({ agendamento, onAdicionarCalendario, onWhatsApp, onNovoAge
       {/* Ações */}
       <div className="card-padded space-y-4">
         <h3 className="font-heading text-lg font-semibold text-neutral-900">O que fazer agora?</h3>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
           <button
             onClick={onAdicionarCalendario}
             className="btn btn-outline btn-full sm:btn-lg"
@@ -528,6 +510,15 @@ function Confirmacao({ agendamento, onAdicionarCalendario, onWhatsApp, onNovoAge
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.472.099-.174.05-.369-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.377-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.67-.297-.472-.404-.915-.57-1.384-.179-.486-.194-.585-.298-.694-.104-.124-.268-.239-.496-.375z"/>
             </svg>
             Confirmar no WhatsApp
+          </button>
+          <button
+            onClick={onEnviarCodigo}
+            className="btn btn-outline btn-full sm:btn-lg"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.472.099-.174.05-.369-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.377-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.67-.297-.472-.404-.915-.57-1.384-.179-.486-.194-.585-.298-.694-.104-.124-.268-.239-.496-.375z"/>
+            </svg>
+            Enviar meu código pelo WhatsApp
           </button>
         </div>
         <button
@@ -733,6 +724,10 @@ export function AbaAgendamento() {
       setEstado(prev => ({ ...prev, erro: 'Informe um telefone válido' }))
       return
     }
+    if (!estado.dadosPaciente.dataNascimento) {
+      setEstado(prev => ({ ...prev, erro: 'Informe sua data de nascimento' }))
+      return
+    }
     if (!estado.dadosPaciente.consentimentoLGPD) {
       setEstado(prev => ({ ...prev, erro: 'É necessário aceitar o consentimento de uso dos dados' }))
       return
@@ -751,7 +746,7 @@ export function AbaAgendamento() {
           horario: estado.horario,
           nome: estado.dadosPaciente.nome,
           telefone: formatarTelefone(estado.dadosPaciente.telefone),
-          dataNascimento: estado.dadosPaciente.dataNascimento || undefined,
+          dataNascimento: estado.dadosPaciente.dataNascimento,
           email: estado.dadosPaciente.email,
           observacoes: estado.dadosPaciente.observacoes,
           consentimentoLGPD: estado.dadosPaciente.consentimentoLGPD,
@@ -833,6 +828,27 @@ export function AbaAgendamento() {
     }
   }
 
+  const handleEnviarCodigoWhatsApp = async () => {
+    if (!estado.agendamentoConfirmado) return
+    try {
+      const res = await fetch('/api/agendamentos/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo: estado.agendamentoConfirmado.codigo,
+          telefone: estado.dadosPaciente?.telefone,
+          tipo: 'acesso',
+        }),
+      })
+      if (res.ok) {
+        const { link } = await res.json()
+        window.open(link, '_blank', 'noopener,noreferrer')
+      }
+    } catch (error) {
+      console.error('Erro ao gerar link WhatsApp do código:', error)
+    }
+  }
+
   const handleNovoAgendamento = () => {
     setEstado({
       passoAtual: 'servico',
@@ -850,13 +866,15 @@ export function AbaAgendamento() {
   const passos: PassoAgendamento[] = ['servico', 'data', 'horario', 'dados', 'confirmacao']
   const passoAtualIndex = passos.indexOf(estado.passoAtual)
 
-  // 2.1 — "Confirmar agendamento" só ativa com nome e telefone válidos E o
-  // checkbox de consentimento marcado. O servidor também recusa sem consentimento.
+  // 2.1 — "Confirmar agendamento" só ativa com nome, data de nascimento e
+  // telefone válidos E o checkbox de consentimento marcado. O servidor também
+  // recusa sem consentimento.
   // (|| '' por segurança: um objeto parcial nunca derruba o render.)
   const dadosPacienteValidos =
     !!estado.dadosPaciente &&
     (estado.dadosPaciente.nome || '').trim().length >= 3 &&
     (estado.dadosPaciente.telefone || '').replace(/\D/g, '').length >= 10 &&
+    !!((estado.dadosPaciente.dataNascimento || '').trim().length > 0) &&
     estado.dadosPaciente.consentimentoLGPD === true
 
   return (
@@ -1046,6 +1064,7 @@ export function AbaAgendamento() {
             agendamento={estado.agendamentoConfirmado}
             onAdicionarCalendario={handleAdicionarCalendario}
             onWhatsApp={handleWhatsApp}
+            onEnviarCodigo={handleEnviarCodigoWhatsApp}
             onNovoAgendamento={handleNovoAgendamento}
           />
         )}

@@ -154,3 +154,58 @@ export async function gerarLinkCancelamento(
   const cfg = await getConfiguracoes()
   return gerarLinkWhatsApp(cfg.clinicaWhatsApp, mensagem)
 }
+
+/** Mensagem de acesso ao agendamento (código + data + horário) para pacientes sem e-mail. */
+export async function gerarMensagemAcesso(dados: {
+  codigo: string
+  pacienteNome: string
+  servicoNome: string
+  dataHora: Date
+}): Promise<string> {
+  const cfg = await getConfiguracoes()
+
+  const dataFormatada = dados.dataHora.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    timeZone: 'America/Sao_Paulo',
+  })
+  const horaFormatada = dados.dataHora.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo',
+  })
+
+  const linhas = [
+    `Olá, ${dados.pacienteNome}! 👋`,
+    '',
+    `Sua consulta foi agendada:`,
+    '',
+    `🦷 *Serviço:* ${dados.servicoNome}`,
+    `📅 *Data:* ${dataFormatada}`,
+    `⏰ *Horário:* ${horaFormatada}`,
+    `🔐 *Código do agendamento:* ${dados.codigo}`,
+    '',
+    `Para acessar sua área de consulta no site, use esse código junto com:`,
+    `• sua data de nascimento`,
+    `• o telefone que você informou no agendamento.`,
+    ``,
+    `Basta abrir o site em "Minha consulta" e escolher a opção "Código de agendamento".`,
+    ``,
+    `— Equipe ${cfg.clinicaNome}`,
+  ]
+
+  return linhas.join('\n')
+}
+
+/** Link wa.me com a mensagem de acesso (código + data + horário) pronta. */
+export async function gerarLinkAcesso(dados: {
+  codigo: string
+  pacienteNome: string
+  servicoNome: string
+  dataHora: Date
+}): Promise<string> {
+  const mensagem = await gerarMensagemAcesso(dados)
+  const cfg = await getConfiguracoes()
+  return gerarLinkWhatsApp(cfg.clinicaWhatsApp, mensagem)
+}

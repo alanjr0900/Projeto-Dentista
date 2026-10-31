@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils';
+import ServiceIcon from '@/components/shared/ServiceIcon'
 import { Agendamento, ConfiguracoesClinica } from '@/types'
 
 interface AdminAgendaProps {
@@ -14,7 +15,7 @@ interface AdminAgendaProps {
 }
 
 type AgComServico = AdminAgendaProps['agendamentosHoje'][number]
-type AcaoAgenda = 'confirmar' | 'concluir' | 'cancelar' | 'falta' | 'remarcar'
+type AcaoAgenda = 'confirmar' | 'concluir' | 'cancelar' | 'falta' | 'remarcar' | 'enviarCodigo'
 type Toast = { tipo: 'ok' | 'erro'; texto: string }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -61,6 +62,26 @@ export function AdminAgenda({ agendamentosHoje, agendamentosSemana, stats, confi
         mostrarToast({ tipo: 'ok', texto: `WhatsApp do paciente aberto em nova aba para remarcar.` })
       } catch {
         mostrarToast({ tipo: 'erro', texto: 'Erro ao gerar o link de remarcação.' })
+      }
+      return
+    }
+
+    if (acao === 'enviarCodigo') {
+      try {
+        const res = await fetch(`/api/admin/agenda?id=${ag.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: ag.id, acao: 'enviarCodigo' }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.link) {
+          mostrarToast({ tipo: 'erro', texto: data.erro || 'Não foi possível abrir o WhatsApp do paciente.' })
+          return
+        }
+        window.open(data.link, '_blank', 'noopener,noreferrer')
+        mostrarToast({ tipo: 'ok', texto: `Código de agendamento enviado via WhatsApp.` })
+      } catch {
+        mostrarToast({ tipo: 'erro', texto: 'Erro ao gerar o link do código.' })
       }
       return
     }
@@ -431,14 +452,7 @@ function VisaoLista({
 function AgendamentoCard({ agendamento, compacto, onAcao }: { agendamento: AgComServico; compacto?: boolean; onAcao: (ag: AgComServico, acao: AcaoAgenda) => void }) {
   return (
     <div className={cn('card p-4 flex items-center gap-4', compacto && 'py-3')}>
-      <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0" aria-hidden="true">
-        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </div>
+      <ServiceIcon className="w-12 h-12" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-mono text-lg font-semibold text-primary-600">{format(new Date(agendamento.dataHora), 'HH:mm')}</span>
@@ -538,6 +552,15 @@ function AcoesAgendamento({ agendamento, compacto, onAcao, ocupado = false }: { 
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
+        </svg>,
+        true
+      )}
+      {botaoAcao(
+        'enviarCodigo',
+        'Enviar código pelo WhatsApp',
+        'hover:bg-accent-50 text-accent-700',
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 19.79 19.79 0 0 1 8.63 3.07A19.5 19.5 0 0 1 20 12a19.79 19.79 0 0 1 3.07 8.67 2 2 0 0 1-1.72 2z" />
         </svg>,
         true
       )}

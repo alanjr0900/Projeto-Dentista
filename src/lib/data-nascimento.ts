@@ -10,6 +10,12 @@
 
 export const TZ_BR = 'America/Sao_Paulo'
 
+/** Idade máxima aceita no cadastro (evita datas de nascimento absurdas). */
+export const IDADE_MAXIMA_ANOS = 120
+
+/** Limite superior (data) para o campo de data de nascimento. */
+export const DATA_NASCIMENTO_MAX: string = new Date().toISOString().slice(0, 10)
+
 /** Aceita "YYYY-MM-DD" (input type=date) ou "DD/MM/YYYY". */
 export function parseDataNascimento(valor: string | null | undefined): Date | null {
   const bruto = String(valor ?? '').trim()
@@ -33,7 +39,7 @@ export function parseDataNascimento(valor: string | null | undefined): Date | nu
   }
 
   if (!ano || !mes || !dia) return null
-  if (ano < 1900) return null
+  // No lower bound on year, allowing all ages
 
   // Valida a data no calendário (rejeita 31/02, etc.)
   const candidata = new Date(Date.UTC(ano, mes - 1, dia, 12, 0, 0))
@@ -82,4 +88,14 @@ export function dataNascimentoConfere(
 ): boolean {
   if (!cadastrada || !informada) return false
   return dataNascimentoParaInput(cadastrada) === dataNascimentoParaInput(informada)
+}
+
+/** Idade em anos completos a partir da data (considera o aniversário). */
+export function calcularIdade(data: Date, agora: Date = new Date()): number {
+  let idade = agora.getFullYear() - data.getFullYear()
+  const antesDoAniversario =
+    agora.getMonth() < data.getMonth() ||
+    (agora.getMonth() === data.getMonth() && agora.getDate() < data.getDate())
+  if (antesDoAniversario) idade -= 1
+  return idade
 }

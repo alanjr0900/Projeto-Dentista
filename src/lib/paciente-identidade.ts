@@ -42,3 +42,30 @@ export function segundoFatorConfere(
   if (!data) return false
   return dataNascimentoConfere(agendamento.paciente?.dataNascimento ?? null, data)
 }
+
+/**
+ * Acesso COMPLETO por código de agendamento (fluxo sem e-mail — pacientes
+ * sem cadastro com e-mail ou que preferem). Exige código + data de nascimento
+ * + telefone, os três conferindo com o mesmo paciente do agendamento.
+ * O telefone é comparado ignorando máscara, espaços, parênteses e o código do
+ * país, para o paciente idoso não errar por formatação.
+ */
+export function dadosAcessoConferem(
+  agendamento: {
+    pacienteTelefone: string
+    paciente?: { dataNascimento: Date | null } | null
+  },
+  dataNascimentoInformada: string,
+  telefoneInformado: string
+): boolean {
+  const data = parseDataNascimento(dataNascimentoInformada)
+  if (!data) return false
+
+  const digitosInformados = String(telefoneInformado ?? '').replace(/\D/g, '')
+  const digitosCadastrados = String(agendamento.pacienteTelefone ?? '').replace(/\D/g, '')
+  const informados = digitosInformados.replace(/^55/, '')
+  const cadastrados = digitosCadastrados.replace(/^55/, '')
+  if (!informados || !cadastrados || informados !== cadastrados) return false
+
+  return dataNascimentoConfere(agendamento.paciente?.dataNascimento ?? null, data)
+}

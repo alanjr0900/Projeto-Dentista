@@ -18,7 +18,7 @@ import { parseDataNascimento } from './data-nascimento'
 
 export const STATUS_ALTERAVEIS = ['PENDENTE', 'CONFIRMADO', 'REMARCADO']
 
-export { segundoFatorConfere } from './paciente-identidade'
+export { segundoFatorConfere, dadosAcessoConferem } from './paciente-identidade'
 
 export type AgendamentoDoPaciente = Awaited<ReturnType<typeof buscarAgendamentoPorCodigo>>
 

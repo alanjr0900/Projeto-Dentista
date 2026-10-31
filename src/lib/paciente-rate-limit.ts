@@ -2,8 +2,9 @@
  * Limite de tentativas do acesso do paciente ("Minha consulta").
  *
  * Conta falhas por IP e por código de agendamento. Ao atingir o limite, a
- * chave fica bloqueada por alguns minutos. A resposta ao paciente é SEMPRE
- * genérica — nunca revela se o código existe ou qual dado estava errado.
+ * chave fica bloqueada por alguns minutos (com espera crescente a cada bloqueio
+ * seguido). A resposta ao paciente é SEMPRE genérica — nunca revela se o código
+ * existe ou qual dado estava errado.
  *
  * Contador em memória (por processo do servidor), como o do login do painel.
  * Ajustável no .env:
@@ -16,6 +17,8 @@ import type { NextRequest } from 'next/server'
 interface EstadoTentativas {
   falhas: number
   bloqueadoAte: number | null
+  /** Quantos bloqueios seguidos já foram aplicados (servem para a espera crescer). */
+  bloqueiosConsecutivos: number
 }
 
 function lerNumero(valor: string | undefined, padrao: number): number {
@@ -36,6 +39,11 @@ const tentativas: Map<string, EstadoTentativas> =
   (globalComContador.__dentistaPacienteRateLimit = new Map())
 
 const JANELA_MS = BLOQUEIO_PACIENTE_MINUTOS * 60 * 1000
+
+/** Estado inicial de uma chave (sem bloqueio, sem falhas, sem bloqueios). */
+function criarEstadoTentativas(): EstadoTentativas {
+  return { falhas: 0, bloqueadoAte: null, bloqueiosConsecutivos: 0 }
+}
 
 /**
  * IP de origem (considera túnel/Cloudflare/proxy).
@@ -111,10 +119,19 @@ export function registrarFalhaPaciente(chaves: string[]) {
   for (const chave of chaves) {
     podar(chave)
     const limite = chave.startsWith('ip:') ? MAX_TENTATIVAS_POR_IP : MAX_TENTATIVAS_POR_CODIGO
-    const estado = tentativas.get(chave) ?? { falhas: 0, bloqueadoAte: null }
+    const estado =
+      tentativas.get(chave) ?? {
+        falhas: 0,
+        bloqueadoAte: null,
+        bloqueiosConsecutivos: 0,
+      }
     estado.falhas += 1
     if (estado.falhas >= limite) {
-      estado.bloqueadoAte = agora + JANELA_MS
+      // Bloqueio com espera CRESCENTE: cada bloqueio seguido dura mais (15min,
+      // 30min, 45min...) — a gravidade escala com a reincidência.
+      estado.bloqueiosConsecutivos += 1
+      const minutosBloqueio = BLOQUEIO_PACIENTE_MINUTOS * Math.min(3, estado.bloqueiosConsecutivos)
+      estado.bloqueadoAte = agora + minutosBloqueio * 60 * 1000
       estado.falhas = 0
     }
     tentativas.set(chave, estado)

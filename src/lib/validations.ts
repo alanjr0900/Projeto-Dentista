@@ -39,12 +39,11 @@ export const agendamentoCompletoSchema = z.object({
   nome: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(120),
   telefone: z.string().regex(telefoneRegex, 'Telefone inválido. Use o formato (XX) XXXXX-XXXX'),
   email: z.string().email('E-mail inválido').max(120).optional().or(z.literal('')),
-  // Opcional: usada como confirmação de identidade em "Minha consulta".
+  // Obrigatória: confirma identidade em "Minha consulta" (e-mail ou código).
   dataNascimento: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de nascimento inválida')
-    .optional()
-    .or(z.literal('')),
+    .min(1, 'Data de nascimento é obrigatória')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de nascimento inválida'),
   observacoes: z.string().max(500).optional(),
   consentimentoLGPD: z.literal(true, {
     errorMap: () => ({ message: 'É necessário aceitar o consentimento de uso dos dados' }),

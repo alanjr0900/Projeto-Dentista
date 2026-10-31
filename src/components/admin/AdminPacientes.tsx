@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import ServiceIcon from '@/components/shared/ServiceIcon'
 import { dataNascimentoParaInput } from '@/lib/data-nascimento'
 import { Agendamento, Paciente } from '@/types'
 
@@ -255,9 +256,7 @@ function PacienteRow({
         className="w-full px-6 py-4 hover:bg-neutral-50 transition-colors text-left flex items-center gap-4"
         aria-expanded={expandido}
       >
-        <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-600 font-semibold text-lg" aria-hidden="true">
-          {paciente.nome.charAt(0).toUpperCase()}
-        </div>
+        <ServiceIcon className="w-12 h-12" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-medium text-neutral-900 truncate">{paciente.nome}</span>
