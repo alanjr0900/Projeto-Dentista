@@ -81,6 +81,17 @@
 - **Build:** `npm run build` concluído com `EXIT=0`, servindo o novo build em
   `http://localhost:3110` e pelo túnel público.
 
+### Correção aplicada após validação
+- **Erro "Application error: a client-side exception has occurred"** na aba
+  `/minha-consulta` logo após o paciente validar o código com sucesso: a resposta
+  de `GET /api/paciente/email/sessao` colocava `agendamentos` no nível raiz do
+  JSON (`{ paciente: {...}, agendamentos: [...] }`), enquanto a tela esperava
+  `paciente.agendamentos`. O `undefined` explodia no render do painel
+  (`paciente.agendamentos.find`). Correção: `agendamentos` agora vem embutido em
+  `paciente`, com fallback defensivo no cliente. Após o fix, os 65 testes de
+  integração OTP passaram novamente (incluindo "sessão lista as consultas
+  ativas").
+
 ### Pendências
 - **Domínio próprio:** comprar/apontar o domínio, verificar SPF/DKIM/DMARC no
   Brevo e trocar as variáveis (`PUBLIC_SITE_URL`, `SMTP_FROM`,

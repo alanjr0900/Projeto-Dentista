@@ -127,7 +127,12 @@ export function MinhaConsulta({ whatsappLink }: { whatsappLink: string }) {
       if (!resposta.ok) return false
 
       const dados = await resposta.json()
-      setPaciente(dados.paciente)
+      // `agendamentos` vem embutido no paciente; garante array mesmo se a
+      // resposta vier com o campo em outra posição.
+      setPaciente({
+        ...dados.paciente,
+        agendamentos: Array.isArray(dados.paciente?.agendamentos) ? dados.paciente.agendamentos : [],
+      })
       if (typeof dados.sessaoMinutos === 'number') setSessaoMinutos(dados.sessaoMinutos)
       return true
     } catch {

@@ -318,8 +318,8 @@ try {
   const sessao = await get('/api/paciente/email/sessao', { cookie: login.cookie })
   ok(sessao.res.status === 200, 'sessão válida é reconhecida')
   ok(sessao.corpo.paciente?.id === pacienteA.id, 'sessão devolve apenas o próprio paciente')
-  ok(sessao.corpo.agendamentos?.length >= 1, 'sessão lista as consultas ativas')
-  ok(Boolean(sessao.corpo.agendamentos[0].prazos), 'prazos vêm calculados do servidor')
+  ok(sessao.corpo.paciente?.agendamentos?.length >= 1, 'sessão lista as consultas ativas')
+  ok(Boolean(sessao.corpo.paciente?.agendamentos?.[0]?.prazos), 'prazos vêm calculados do servidor')
 
   const alheioHorarios = await get(`/api/paciente/email/horarios?agendamentoId=${agendamentoB.id}`, {
     cookie: login.cookie,

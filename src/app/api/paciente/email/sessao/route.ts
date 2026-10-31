@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
         nome: paciente.nome,
         email: paciente.email,
         telefone: paciente.telefone,
+        agendamentos: paciente.agendamentos.map(resumoAgendamentoComPrazos),
       },
-      agendamentos: paciente.agendamentos.map(resumoAgendamentoComPrazos),
       sessaoMinutos: SESSAO_PACIENTE_MINUTOS,
     },
     { headers: { 'Cache-Control': 'no-store' } }
