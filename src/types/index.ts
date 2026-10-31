@@ -71,6 +71,7 @@ export type EstadoAgendamento = {
   dadosPaciente?: {
     nome: string
     telefone: string
+    dataNascimento?: string
     email?: string
     observacoes?: string
     consentimentoLGPD: boolean

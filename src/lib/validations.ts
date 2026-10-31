@@ -39,6 +39,12 @@ export const agendamentoCompletoSchema = z.object({
   nome: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(120),
   telefone: z.string().regex(telefoneRegex, 'Telefone inválido. Use o formato (XX) XXXXX-XXXX'),
   email: z.string().email('E-mail inválido').max(120).optional().or(z.literal('')),
+  // Opcional: usada como confirmação de identidade em "Minha consulta".
+  dataNascimento: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de nascimento inválida')
+    .optional()
+    .or(z.literal('')),
   observacoes: z.string().max(500).optional(),
   consentimentoLGPD: z.literal(true, {
     errorMap: () => ({ message: 'É necessário aceitar o consentimento de uso dos dados' }),
@@ -48,7 +54,7 @@ export const agendamentoCompletoSchema = z.object({
 
 // Esquema para cancelamento/remarcação
 export const cancelarRemarcarSchema = z.object({
-  // Códigos do app são 8 chars (gerarCodigoAgendamento); registros antigos
+  // Códigos gerados em src/lib/codigo.ts têm 8 chars; registros antigos
   // podem ter cuid() do banco. Aceita os dois formatos.
   codigo: z.string().min(6).max(40).regex(/^[A-Za-z0-9]+$/, 'Código de agendamento inválido'),
   telefone: z.string().regex(telefoneRegex, 'Telefone inválido. Use o formato (XX) XXXXX-XXXX'),

@@ -67,15 +67,8 @@ export function formatarDataHoraBR(data: Date | string): string {
   return `${formatarDataBR(d)} às ${formatarHoraBR(d)}`
 }
 
-export function gerarCodigoAgendamento(): string {
-  // Gera código legível: 8 caracteres alfanuméricos
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Remove chars confusos
-  let codigo = ''
-  for (let i = 0; i < 8; i++) {
-    codigo += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return codigo
-}
+// Geração de código do agendamento fica em `src/lib/codigo.ts` (crypto).
+// Não reintroduza Math.random aqui: o código é credencial de acesso.
 
 export function slugify(texto: string): string {
   return texto

@@ -77,9 +77,28 @@ SMTP_PORT="587"
 SMTP_USER=""
 SMTP_PASS=""
 SMTP_FROM=""
+EMAIL_PROVIDER="brevo"
+EMAIL_FROM_NAME="Dra. Luciana"
 
-# URL pública (links de gestão nos e-mails)
-PUBLIC_BASE_URL="http://localhost:3000"
+# Login por código no e-mail ("Minha consulta")
+OTP_VALIDADE_MINUTOS=10
+OTP_MAX_TENTATIVAS=5
+OTP_MAX_BLOQUEIOS=3
+OTP_BLOQUEIO_MINUTOS=30
+OTP_MAX_ENVIOS_EMAIL_HORA=3
+OTP_MAX_PEDIDOS_IP_HORA=10
+OTP_INTERVALO_REENVIO_SEGUNDOS=60
+OTP_TEMPO_RESPOSTA_MS=800
+IP_HEADER=""
+PACIENTE_COOKIE_NAME="consulta-sessao-otp"
+PACIENTE_COOKIE_SAMESITE="lax"
+PACIENTE_COOKIE_DOMAIN=""
+PACIENTE_SESSAO_MINUTOS=30
+CRON_SECRET=""
+
+# URL pública (links de gestão nos e-mails e cookies)
+PUBLIC_SITE_URL="http://localhost:3110"
+PUBLIC_BASE_URL="http://localhost:3110"
 ```
 
 **Importante:** sem as credenciais de Google/SMTP **nada quebra** — o site
@@ -94,6 +113,76 @@ openssl rand -base64 32
 # Secret do NextAuth
 openssl rand -base64 32
 ```
+
+### 📧 Login por código no e-mail ("Minha consulta")
+
+A aba pública **Minha consulta** não usa mais o código do agendamento como
+credencial principal. O paciente informa o e-mail; se ele estiver cadastrado,
+o servidor gera um código de 6 dígitos e envia pelo SMTP configurado.
+
+- A resposta é sempre a mesma, exista ou não o e-mail:
+  **"Se este e-mail estiver cadastrado, enviamos um código de acesso."**
+  O tempo de resposta também é padronizado (`OTP_TEMPO_RESPOSTA_MS`).
+- O código é gerado com `crypto.randomInt`, tem validade de **10 minutos**,
+  uso único e só o hash HMAC-SHA256 fica no banco.
+- Pedir um novo código invalida o anterior.
+- **5 tentativas erradas** invalidam o código. **3 códigos invalidados
+  seguidos** bloqueiam novos pedidos para aquele e-mail por **30 minutos**.
+- Limites: **3 envios por e-mail/hora**, **10 pedidos por IP/hora** e
+  **60 segundos** entre reenvios. Tudo validado no servidor; o botão
+  "Reenviar código" mostra a contagem regressiva.
+- A sessão é um cookie **HttpOnly** assinado, com `SameSite` configurável e
+  `Secure` automático em HTTPS, válido por **30 minutos de inatividade**.
+  As rotas de diagnósticos, horários, remarcação e cancelamento revalidam a
+  sessão no servidor e só aceitam consultas do próprio paciente.
+- O envio fica isolado em `src/lib/email/` (`service.ts` + `providers/`).
+  Para trocar de provedor, mexa apenas nessa camada e ajuste
+  `EMAIL_PROVIDER`; chaves e remetente continuam só no `.env`/`.env.local`.
+- O código e o e-mail completo nunca vão para o log. A tela mostra um aviso
+  curto de privacidade.
+
+Rotina de limpeza: códigos expirados e contadores antigos são apagados
+automaticamente (no máximo 1x/hora, na primeira requisição) e também pelo
+endpoint `POST /api/paciente/otp/limpeza`, protegido por `CRON_SECRET` quando
+essa variável estiver definida.
+
+### 🌐 Migração para domínio próprio (Brevo + DNS)
+
+Nenhum endereço fica fixo no código. Para trocar `localhost`/túnel pelo
+domínio definitivo:
+
+1. **Compre o domínio** (ex.: `consultoriodaluciana.com.br`) e aponte o DNS
+   para onde o site está hospedado (registro `A`/`AAAA` ou `CNAME`, conforme
+   o provedor). Ative HTTPS — o cookie de sessão passa a usar `Secure`
+   automaticamente.
+2. **No Brevo**, cadastre o domínio em *Senders & IP → Domains* e crie os
+   registros que ele pedir:
+   - **SPF**: TXT no domínio (`v=spf1 include:spf.brevo.com ~all`, ou o valor
+     indicado pelo Brevo);
+   - **DKIM**: dois registros CNAME fornecidos pelo Brevo (não altere os
+     valores);
+   - **DMARC**: TXT em `_dmarc` (comece com `v=DMARC1; p=none; rua=mailto:...`
+     e depois endureça para `quarantine`).
+   Aguarde a propagação e confirme no painel do Brevo que o domínio está
+   **verificado**.
+3. **No `.env`/`.env.local` do servidor**, troque apenas:
+   ```env
+   PUBLIC_SITE_URL="https://www.seudominio.com.br"
+   PUBLIC_BASE_URL="https://www.seudominio.com.br"   # compatibilidade
+   SMTP_FROM="nao-responda@seudominio.com.br"        # remetente verificado
+   EMAIL_FROM_NAME="Dra. Luciana"
+   PACIENTE_COOKIE_DOMAIN=".seudominio.com.br"       # opcional, para subdomínios
+   IP_HEADER="cf-connecting-ip"                      # se usar Cloudflare; senão deixe vazio
+   ```
+   Não é preciso alterar código.
+4. **Reinicie o servidor** para ler as variáveis novas e teste: pedir código,
+   receber, entrar, abrir diagnósticos, remarcar e sair.
+5. **Confira o spam**: envie um código para um Gmail/Outlook e veja se cai na
+   caixa de entrada. Se cair em spam, revise SPF/DKIM/DMARC e o remetente.
+
+> Segredos (`SMTP_PASS`, `AUTH_SECRET`, `CRON_SECRET`) ficam **somente** no
+> `.env`/`.env.local` do servidor. Esses arquivos estão no `.gitignore` e
+> nunca devem ser commitados.
 
 ### 🔐 Como a dentista acessa o painel
 

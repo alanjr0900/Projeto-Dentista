@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { cancelarRemarcarSchema } from '@/lib/validations'
 import { getConfiguracoes } from '@/lib/config'
 import { validarHorarioDisponivel, calcularDisponibilidade } from '@/lib/disponibilidade'
-import { addHours } from 'date-fns'
+import { normalizarCodigo } from '@/lib/codigo'
+import { PRAZO_REAGENDAMENTO_HORAS, mensagemPrazoReagendamento, respeitaPrazo } from '@/lib/prazos'
 import { googleAtivo, horarioLivre, moverEvento, criarEvento, type DadosEventoConsulta } from '@/lib/google/agenda'
 import { enviarRemarcacao, linkGestao, emailConfigurado } from '@/lib/email'
 import { gerarArquivoICS, gerarNomeArquivoICS } from '@/lib/ics'
@@ -32,7 +33,7 @@ export async function POST(
     }
 
     const agendamento = await prisma.agendamento.findUnique({
-      where: { codigo },
+      where: { codigo: normalizarCodigo(codigo) },
       include: { servico: true },
     })
 
@@ -53,14 +54,14 @@ export async function POST(
     }
 
     // Verificar antecedência mínima para o agendamento ORIGINAL
+    // (fonte única dos prazos: src/lib/prazos.ts)
     const cfg = await getConfiguracoes()
     const agora = new Date()
-    const limiteAlteracao = addHours(agendamento.dataHora, -cfg.antecedenciaMinimaHoras)
-    
-    if (agora > limiteAlteracao) {
+
+    if (!respeitaPrazo(agendamento.dataHora, PRAZO_REAGENDAMENTO_HORAS, agora)) {
       return NextResponse.json(
-        { erro: `Alteração só é permitida com ${cfg.antecedenciaMinimaHoras}h de antecedência da consulta original` },
-        { status: 400 }
+        { erro: mensagemPrazoReagendamento(), codigo: 'PRAZO' },
+        { status: 422 }
       )
     }
 
@@ -80,6 +81,14 @@ export async function POST(
     const novoInicio = new Date(`${novaData}T${novoHorario}:00-03:00`)
     const novoFim = new Date(novoInicio.getTime() + novoServico.duracaoMin * 60 * 1000)
 
+    // O novo horário também precisa respeitar o prazo mínimo de 48h.
+    if (!respeitaPrazo(novoInicio, PRAZO_REAGENDAMENTO_HORAS, agora)) {
+      return NextResponse.json(
+        { erro: mensagemPrazoReagendamento(), codigo: 'PRAZO' },
+        { status: 422 }
+      )
+    }
+
     if (googleAtivo()) {
       const check = await horarioLivre(novoInicio, novoFim, agendamento.googleEventoId)
       if (!check.livre) {
@@ -94,7 +103,7 @@ export async function POST(
         where: {
           dataHora: new Date(`${novaData}T${novoHorario}:00-03:00`),
           status: { notIn: ['CANCELADO', 'FALTA'] },
-          NOT: { codigo }, // Excluir o próprio agendamento
+          NOT: { codigo: normalizarCodigo(codigo) }, // Excluir o próprio agendamento
         },
       })
       if (conflito) {
@@ -103,7 +112,7 @@ export async function POST(
 
       // Atualizar agendamento
       await tx.agendamento.update({
-        where: { codigo },
+        where: { codigo: normalizarCodigo(codigo) },
         data: {
           servicoId: novoServicoId,
           dataHora: new Date(`${novaData}T${novoHorario}:00-03:00`),
@@ -135,7 +144,7 @@ export async function POST(
           // Agendamento anterior a integração: cria o evento agora e vincula
           const eventoId = await criarEvento(dadosEvento)
           await prisma.agendamento.update({
-            where: { codigo },
+            where: { codigo: normalizarCodigo(codigo) },
             data: { googleEventoId: eventoId },
           })
         }

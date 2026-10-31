@@ -1,90 +1,118 @@
-# RESUMO — Pacote de melhorias (1.1–3.6)
+# Resumo das Alterações - Aba "Minha Consulta"
 
-Data: 27/10/2026 · Executado em modo autônomo, em fases, com commit ao fim de cada uma.
-Build de produção OK (`npm run build` EXIT 0) e testes unitários estáveis 14/14 em todas as fases.
+## Fase 2 — Login por código no e-mail (OTP) e preparação para domínio próprio
 
-## 1. O que foi feito
+### O que foi feito
+- **Login por código no e-mail (OTP):** a aba pública `/minha-consulta` passou a
+  autenticar pelo e-mail informado. Se o e-mail estiver cadastrado, o servidor
+  gera um código de 6 dígitos e envia pelo SMTP configurado (Brevo).
+- **Resposta neutra:** exista ou não o e-mail, a resposta é sempre
+  `Se este e-mail estiver cadastrado, enviamos um código de acesso.` com o
+  mesmo corpo e tempo mínimo (`OTP_TEMPO_RESPOSTA_MS`, padrão 800 ms). O envio
+  SMTP roda fora do caminho da resposta para não revelar a existência do e-mail
+  pelo tempo.
+- **Segurança do código:** gerado com `crypto.randomInt` (faixa completa
+  000000–999999), validade de 10 minutos, uso único, novo código invalida o
+  anterior. No banco fica apenas o hash HMAC-SHA256 (`AUTH_SECRET` ou
+  `OTP_HASH_SECRET`).
+- **Tentativas e bloqueios:** 5 tentativas erradas invalidam o código; 3 códigos
+  invalidados seguidos bloqueiam novos pedidos para aquele e-mail por 30 minutos.
+- **Limites de envio (no servidor):** 3 códigos por e-mail/hora, 10 pedidos por
+  IP/hora e intervalo mínimo de 60 s entre reenvios (com contagem regressiva no
+  botão). IP real lido de cabeçalho configurável (`IP_HEADER`, padrão
+  `x-forwarded-for` → `cf-connecting-ip` → `x-real-ip`).
+- **Sessão do paciente:** cookie `HttpOnly` assinado, `SameSite` configurável,
+  `Secure` automático em HTTPS, 30 minutos de inatividade (renovado a cada
+  requisição autenticada) e botão **Sair**. A sessão é do paciente — não de um
+  agendamento.
+- **Rotas do paciente (OTP):** `/api/paciente/email/login`, `validar`, `sessao`,
+  `logout`, `diagnosticos`, `horarios`, `remarcar`, `cancelar` e
+  `/api/paciente/otp/limpeza`. Todas revalidam a sessão no servidor e conferem
+  que o agendamento pertence ao paciente autenticado.
+- **Camada de e-mail isolada:** `src/lib/email/service.ts` +
+  `src/lib/email/providers/brevo.ts` (SMTP genérico). Trocar de provedor exige
+  mexer só nessa camada e ajustar `EMAIL_PROVIDER`. Chaves e remetente ficam
+  somente em `.env`/`.env.local`.
+- **Logs sem dados sensíveis:** `src/lib/log-seguro.ts` mascara e-mails e
+  códigos de 6 dígitos em qualquer mensagem de erro antes de logar.
+- **Regra de agendamento por e-mail:** se o e-mail já existe, o novo agendamento
+  só é aceito com o mesmo nome, ignorando maiúsculas, acentos e espaços extras
+  (`src/lib/nome-pessoa.ts`). Telefone não participa dessa validação.
+- **Tabelas novas/ajustadas:** `CodigoAcesso.bloqueiosConsecutivos`,
+  `LimiteEnvioEmail`, `LimiteEnvioIp.janelaInicio`, `TentativaAcesso` e
+  `LogAcessoDiagnostico.agendamentoId` opcional. A limpeza apaga códigos
+  expirados, contadores antigos e auditoria vencida (automática no login, no
+  máximo 1x/hora, e pelo endpoint de limpeza protegido por `CRON_SECRET`).
+- **Preparação para domínio próprio:** nenhuma URL/remetente fixo no código.
+  `.env.example` e README documentam `PUBLIC_SITE_URL`, `SMTP_FROM`,
+  `PACIENTE_COOKIE_DOMAIN`, `IP_HEADER` e o passo a passo de DNS no Brevo
+  (SPF, DKIM, DMARC).
+- **UI:** tela de login por e-mail com código de 6 dígitos, aviso curto de
+  privacidade, painel de consultas, diagnósticos liberados, escolha de novo
+  horário, cancelamento e logout.
 
-### Fase A — Página pública (commit "Fase A: pagina publica (1.1-1.5)...")
-- **1.1** Todos os e-mails/telefones clicáveis (`mailto:` e `tel:`), WhatsApp com `wa.me` + `noopener noreferrer`.
-- **1.2** Rodapé reformulado: telefone/WhatsApp/e-mail em links; endereço sai do footer (fica no mapa, seção 1.3).
-- **1.3** Seção "Onde nos encontrar" reorganizada: card **Contato** | **mapa do Google Maps** (iframe `output=embed`, `loading="lazy"`, botão "Abrir no Google Maps") e horários embaixo ocupando as duas colunas; no celular empilha na ordem contato → mapa → horários.
-  - Fonte única de contato: novo **`src/lib/contato.ts`** (regra permanente 4 em `AGENTS.md`) — `WHATSAPP_NUMERO=5511964074862`, `TELEFONE_EXIBICAO=+55 11 96407-4862`, `ENDERECO=Avenida Pietro Petri, 601`, `LINK_LIGAR`, `linkWhatsApp()`, `MAPS_LINK`, `MAPS_EMBED_SRC`.
-  - `getConfiguracoes` sobrescreve telefone/WhatsApp/endereço com `contato.ts` (valores antigos do painel/banco são ignorados). Sem placeholders `(XX) XXXX-XXXX` em lugar nenhum.
-- **1.4** Botão flutuante de WhatsApp com o **SVG oficial** e `aria-label="Falar pelo WhatsApp"`.
-- **1.5** Botão **"Informações do dia"** no header (desktop e mobile); abre modal que busca `/api/aviso-do-dia` (rota pública somente-leitura) e fecha por X, Esc e clique fora.
-  - **Aviso automático**: ao carregar uma página pública o site busca a mensagem atual e, se não estiver vazia, abre o modal sozinho (mesma máscara desfocada). Texto vazio → nada aparece. Após fechar, **não reabre** até recarregar a página ou a doutora trocar o texto (registro numa variável de módulo, que zera a cada reload); trocas são percebidas a cada 30s e ao voltar para a aba. O botão do header continua abrindo normalmente, sempre com a versão mais recente.
-  - `/api/aviso-do-dia` agora é **`force-dynamic`**: sem isso o Next pré-renderizava o GET no build e o público ficaria preso ao texto antigo, ignorando tudo que o painel gravasse depois.
+### Decisões Tomadas
+- **Rotas legadas preservadas:** o acesso por código de agendamento continua
+  funcionando; o fluxo OTP foi adicionado em paralelo sob `/api/paciente/email/`.
+- **E-mails duplicados:** quando há mais de um cadastro com o mesmo e-mail, o
+  sistema escolhe de forma determinística o de atividade mais recente (última
+  consulta ou atualização), evitando acesso "alternado" entre registros.
+- **Envio assíncrono:** o login dispara o e-mail sem aguardar o SMTP; mesmo que
+  o provedor falhe, a resposta permanece neutra e o código pode ser reenviado.
+- **Build em VPS pequena:** `next.config.js` usa 1 worker de build
+  (`experimental.cpus: 1`, sem worker thread, sem file tracing) e o
+  type-check roda separado por `npm run typecheck`.
+- **Validação de tipos fora do build:** `typescript.ignoreBuildErrors` e
+  `eslint.ignoreDuringBuilds` ficam ligados apenas porque o worker de tipos do
+  Next é encerrado por memória nesta máquina; a validação real é feita por
+  `npx tsc --noEmit` e `npx vitest run`.
 
-### Fase B — Consentimento no agendamento (2.1) (commit 6c67180)
-- Botão **"Confirmar agendamento"** só ativa com nome ≥ 3 caracteres, telefone ≥ 10 dígitos **e** consentimento marcado (`disabled` + `opacity-40` + `title` explicativo).
-- Servidor também recusa: `consentimentoLGPD: z.literal(true)` → 400 "É necessário aceitar o consentimento de uso dos dados".
-- Correção durante a verificação: o spread `{ ...prev.dadosPaciente, [campo]: valor }` em `handleDadosChange` criava objeto parcial (só o primeiro campo digitado) e um `.replace` em `undefined` derrubava a hidratação de `/agendar` — agora os campos são inicializados com defaults e a validação do render usa fallbacks `|| ''`.
+### Testes Realizados
+- **Unitários:** 76 testes via Vitest (12 arquivos), todos passando.
+- **Tipos:** `npx tsc --noEmit` sem erros.
+- **Integração:** 65 verificações via `scripts/teste-otp.mjs` contra o servidor
+  de produção na porta 3110 — resposta neutra (corpo e tempo), limites por
+  e-mail/IP/intervalo, 5 tentativas, 3 bloqueios e 30 minutos, login válido,
+  cookie HttpOnly/SameSite/Max-Age, sessão, posse do agendamento (404 para
+  consulta de outro paciente), diagnósticos com auditoria, horários, remarcação,
+  cancelamento, cookie adulterado, logout e ausência de código/e-mail em claro.
+- **SMTP real:** envio de teste aceito pelo Brevo (`250 OK`), sem código e sem
+  e-mail completo em log.
+- **Build:** `npm run build` concluído com `EXIT=0`, servindo o novo build em
+  `http://localhost:3110` e pelo túnel público.
 
-### Fase C — Cabeçalho admin e campo de senha (3.5 + 3.6) (commit ae64fbe)
-- **3.5** Novo `MenuPainel.tsx`: título "Área da Dentista" à esquerda; Agenda / Serviços / Pacientes / Configurações (botões arredondados, página ativa com `bg-accent-100` + `aria-current`) e "Sair" discreto. No celular quebra linha (`flex-wrap`). O caminho do painel vem do servidor (`ADMIN_PATH` via props).
-- **3.6** Login com cadeado fixo à esquerda e **botão de olho** à direita (`aria-label` Mostrar/Ocultar senha, `aria-pressed`, alterna `password`↔`text`).
+### Pendências
+- **Domínio próprio:** comprar/apontar o domínio, verificar SPF/DKIM/DMARC no
+  Brevo e trocar as variáveis (`PUBLIC_SITE_URL`, `SMTP_FROM`,
+  `PACIENTE_COOKIE_DOMAIN`, `IP_HEADER`) — passo a passo no README.
+- **Agendador da limpeza:** opcional; agendar `POST /api/paciente/otp/limpeza`
+  com `CRON_SECRET` em produção.
+- **Pendência de infraestrutura:** o worker de tipos do `next build` é
+  encerrado por memória nesta máquina; o build é válido e o type-check é feito
+  pelo comando dedicado.
 
-### Fase D — Pacientes e Informações do dia (3.3 + 3.4) (commit 3a95884)
-- **3.3** Prisma: `Paciente.consentimentoEm`, `Paciente.primeiroAgendamentoEm` e tabela nova **`AnotacaoPaciente`** (prontuário datado, `onDelete: Cascade`). Migração 100% aditiva e reversível documentada em `prisma/migracoes/2026-10-27-fase-d-consentimento-prontuario.md` (aplicada com `prisma db push`; projeto não usa pasta migrations).
-  - POST `/api/agendamentos` cria/víncula o paciente ANTES e grava `consentimentoEm`/`primeiroAgendamentoEm` + `pacienteId`.
-  - Aba Pacientes: ordem cronológica pelo 1º agendamento (sem `primeiroAgendamentoEm` vai pro fim, por nome), bloco **Cadastro** (consentimento e 1º agendamento com data/hora), **busca** e **prontuário datado** (GET/POST `/api/admin/pacientes/[id]/prontuario`, notas com data/hora, preservadas como histórico, texto puro).
-  - Correção durante a verificação: filtro de busca por telefone chamado `includes('')` era sempre verdadeiro e fazia a busca por nome não filtrar — agora só compara dígitos quando a busca tem dígitos.
-- **3.4** Campo **"Informações do dia"** nas Configurações (textarea 500 car. com contador, Salvar/Limpar) usando rota dedicada `PUT/DELETE /api/admin/aviso-do-dia` — não toca na rota geral de configurações (que apaga fotos e sobrescreve configs). O texto aparece no modal público **sempre como texto puro** (HTML inserido no painel aparece escapado).
+---
 
-### Fase E — Ações da agenda e remarcar via WhatsApp (3.1 + 3.2) (commit "Fase E: acoes da agenda...")
-- **3.1** Confirmar / Concluir / Cancelar (com `window.confirm` mostrando nome do paciente e data) / Falta: atualizam o status **sem recarregar a página** (cópias locais das listas + toast `role="status"`). Cancelamento também remove o evento do Google Calendar quando existe; falha do Google nunca falha a ação. Botões só-ícone com `aria-label` + tooltip.
-- **3.2** Relógio "Remarcar": abre o **WhatsApp do paciente** com número e mensagem montados **no servidor** (PATCH `/api/admin/agenda?id=...`) — número validado (11 dígitos ou DDI 55 + 11; senão 422 com mensagem clara) e mensagem com nome, serviço, data e hora em pt-BR.
+# Fase 1 — Acesso por código de agendamento
 
-## 2. Testes
+## O que foi feito
+- **Acesso do Paciente:** Criada página `/minha-consulta` com login via código de agendamento (8 chars, seguro) e segundo fator (data de nascimento ou 4 dígitos do telefone).
+- **Segurança:** Sessão curta (15 min) em cookie assinado (HMAC), rate limit por IP/código com bloqueio temporário e mensagens genéricas (anti-enumeração).
+- **Diagnósticos:** Aba de diagnósticos que exibe apenas notas do prontuário marcadas como "Liberado para o paciente" no painel admin. Acesso registrado em log (LGPD).
+- **Gestão de Agendamento:** Funcionalidades de remarcar e cancelar integradas ao Google Calendar e banco de dados, com histórico de alterações.
+- **Prazos (48h):** Implementação rigorosa de antecedência mínima de 48h para alterações, centralizada em `src/lib/prazos.ts`.
+- **UI/UX:** Interface responsiva, sofisticada e acolhedora, com ícone de acesso rápido no Header mobile e link no desktop.
+- **Admin:** Adicionado controle de liberação no prontuário e campo de data de nascimento (opcional) no cadastro de pacientes e formulário de agendamento.
 
-- `npm run build` → EXIT 0 em todas as fases (incluindo as correções da verificação).
-- `npx vitest run src/lib/enquadramento-editor.test.ts src/lib/rate-limit.test.ts` → **14/14 aprovados**.
-- Testes **pré-existentes que já falhavam antes deste trabalho** (não alterados, fora do escopo): `disponibilidade.test.ts`, `AbaAgendamento.test.tsx`.
-- Verificação no navegador (produção `next start` em `127.0.0.1:3110`):
-  - **Pública `/`**: card Contato, mapa embed + botão Google Maps, `tel:`/`wa.me` corretos, sem "(XX)" nem número antigo, footer sem endereço, botão "Informações do dia". **Mobile 390×844 (iframe real)**: ícone compacto do aviso, modal dentro da tela, layout íntegro (screenshot).
-  - **Modal 1.5**: vazio → "Nenhum aviso para hoje."; fecha por X/Esc/clique fora; aviso com `<b>` do painel aparece **escapado** (texto puro).
-  - **Login/segurança**: sem sessão o login exibe APENAS o cartão; `/painel-dra-luciana` sem sessão não vaza título/menu; `/api/admin/*` sem sessão → **401**. "Informações do dia" só no header público.
-  - **2.1**: botão começa `disabled` com `title`; ativa exatamente quando nome+telefone+consentimento OK; POST direto sem `consentimentoLGPD` → 400.
-  - **3.1**: Falta → status "Faltou" sem recarregar + toast; Cancelar → diálogo com a mensagem certa, recusa mantém o status, aceitação cancela + toast. (Statuses de teste restaurados.)
-  - **3.2**: PATCH devolve `https://wa.me/5511955554444?text=...` com mensagem correta; telefone inválido → 422 com mensagem clara.
-  - **3.3**: busca por nome ("Pamela" → 1 linha) e por telefone ("98888" → 2 linhas certas); nota de prontuário criada datada (27/10/2026 17:54) e **persistida após restart do servidor** (nota de teste apagada em seguida).
-  - **3.4**: aviso salvo via UI com contador e retornado por `/api/aviso-do-dia`.
-- Infra: `next start` em `127.0.0.1:3110` ligado; **nenhum dado do painel exposto** (só 127.0.0.1 na 3110); **Cloudflare túnel parado** (0 processos `cloudflared`).
+## Decisões Tomadas
+- **Prazo de Cancelamento:** Definido como 48h (mesmo do reagendamento) para consistência, conforme permissão no briefing.
+- **Segunda Identidade:** Aceita múltiplos formatos de data (DD/MM/AAAA, ISO, sem separadores) para facilitar o acesso.
+- **Transição de Códigos:** Backfill automático converteu códigos `cuid()` e códigos com caracteres ambíguos para o novo padrão seguro.
 
-## 3. Decisões
+## Testes Realizados
+- **Unitários:** 59 testes via Vitest (identidade, prazos, rate-limit, sessões, códigos).
+- **Integração:** 41 passos validados via script `teste-minha-consulta.mjs` no servidor de produção (login, bloqueios 48h, privacidade da agenda, log LGPD).
+- **Build:** `npm run build` executado sem erros.
 
-1. **Fonte única de contato** em `src/lib/contato.ts` + override em `getConfiguracoes` (regra permanente 4): garante um só lugar para trocar número/endereço, mesmo que o banco tenha valores antigos.
-2. **Commit por fase** substitui o histórico único (regra permanente 5 em `AGENTS.md`).
-3. Migração 3.3 via `prisma db push` (padrão do projeto) com SQL de reversão documentado em `prisma/migracoes/`.
-4. **3.4 em rota dedicada** (`/api/admin/aviso-do-dia`), porque POST `/api/admin/configuracoes` apaga fotos (`foto-dentista-*`) e sobrescreve configs — nunca usar em testes.
-5. **3.1 no PUT já existente** de `/api/admin/agenda` (com `confirmadoEm/canceladoEm` e remarcar) + `excluirEvento` do Google no cancelamento; PUT duplicado criado por engano foi removido.
-6. **3.2 com wa.me montado no servidor** (validação de celular com DDI/DDD) — o navegador só abre o link pronto.
-7. `start-local.ps1` (script do responsável que apareceu na pasta) ficou fora dos commits (`.gitignore`), junto com `prisma/backup-*.db` (LGPD: dados de pacientes fora do git).
-8. Correções achadas na verificação viraram um 6º commit ("Correção: hidratação..."): dados parciais do paciente em `AbaAgendamento` e filtro de busca de `AdminPacientes`.
-
-## 4. Pendências
-
-- ~~Testes pré-existentes falhando (`disponibilidade.test.ts`, `AbaAgendamento.test.tsx`)~~ **Corrigido (27/10, verificação independente)**: os 37 testes passam. Correções: testes chamavam `setHours` sem a hora e esperavam número de slots contra a semântica real (slots sobrepostos com intervalo < duração por design); trocado `vi.requireActual` (API Jest) por `vi.importActual`; `getConfiguracoes` agora usa fallback do React `cache` fora do App Router; `globals: true` no vitest (auto-cleanup do DOM); helpers puros de `disponibilidade.ts` exportados para os testes.
-- Testes E2E Playwright não executados (cobertura via build + vitest + verificação manual no navegador).
-- Quando o telefone/endereço mudar de novo: editar **somente** `src/lib/contato.ts`.
-- Aviso do dia de teste ficou gravado no banco (`aviso_do_dia` com `<b>` escapado) — limpar em Configurações > Informações do dia quando quiser.
-
-## 5. Como iniciar
-
-```powershell
-cd dentista-app
-npm install            # primeira vez
-npx prisma db push     # (re)aplica o schema no prisma/dev.db
-npm run build          # build de produção
-npx next start -H 127.0.0.1 -p 3110   # site + painel só em localhost
-# desenvolvimento (NÃO usar junto com next start; o dev sobrescreve .next):
-# npm run dev
-
-# Acesso
-# Site público:  http://127.0.0.1:3110/
-# Agendamento:   http://127.0.0.1:3110/agendar
-# Painel:        http://127.0.0.1:3110/painel-dra-luciana  (senha @J231209090301)
-```
-
-Regras do projeto: ver `AGENTS.md`. Backup pré-mudança: `prisma/backup-dev-20261027-171408.db` (fora do git).
+## Pendências
+- (Nenhuma) Sistema testado e em produção na porta 3110.

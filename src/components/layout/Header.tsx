@@ -173,6 +173,19 @@ export function Header({ isAdminPage = false, nomeDentista = 'Dra. [Nome]' }: He
                 >
                   Contato
                 </Link>
+                <Link
+                  href="/minha-consulta"
+                  className={cn(
+                    'px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    pathname === '/minha-consulta'
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-neutral-600 hover:text-primary-600 hover:bg-primary-50'
+                  )}
+                  aria-current={pathname === '/minha-consulta' ? 'page' : undefined}
+                  data-testid="nav-minha-consulta"
+                >
+                  Minha consulta
+                </Link>
                 {/* 1.5 — Botão "Informações do dia", antes de "Agendar consulta" */}
                 <button
                   type="button"
@@ -204,6 +217,23 @@ export function Header({ isAdminPage = false, nomeDentista = 'Dra. [Nome]' }: He
                 >
                   Informações do dia
                 </button>
+                <Link
+                  href="/minha-consulta"
+                  className={cn(
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                    pathname === '/minha-consulta'
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-neutral-600 hover:bg-primary-50 hover:text-primary-600'
+                  )}
+                  aria-label="Minha consulta"
+                  aria-current={pathname === '/minha-consulta' ? 'page' : undefined}
+                  data-testid="nav-minha-consulta-mobile"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </Link>
                 <Link
                   href="/agendar"
                   className="btn btn-primary btn-compact shrink-0"

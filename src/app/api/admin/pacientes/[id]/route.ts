@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { parseDataNascimento } from '@/lib/data-nascimento'
 
 const updatePacienteSchema = z.object({
   anotacoes: z.string().max(2000).optional(),
+  /** Data de nascimento em "YYYY-MM-DD" (input type=date) ou null para limpar. */
+  dataNascimento: z.union([z.string(), z.null()]).optional(),
 })
 
 // PUT - Atualizar anotações do paciente
@@ -26,9 +29,25 @@ export async function PUT(
       return NextResponse.json({ erro: 'Dados inválidos' }, { status: 400 })
     }
 
+    const dados: { anotacoes?: string | null; dataNascimento?: Date | null } = {}
+    if (resultado.data.anotacoes !== undefined) {
+      dados.anotacoes = resultado.data.anotacoes
+    }
+    if (resultado.data.dataNascimento !== undefined) {
+      if (resultado.data.dataNascimento === null || resultado.data.dataNascimento === '') {
+        dados.dataNascimento = null
+      } else {
+        const data = parseDataNascimento(resultado.data.dataNascimento)
+        if (!data) {
+          return NextResponse.json({ erro: 'Data de nascimento inválida' }, { status: 400 })
+        }
+        dados.dataNascimento = data
+      }
+    }
+
     const paciente = await prisma.paciente.update({
       where: { id },
-      data: { anotacoes: resultado.data.anotacoes },
+      data: dados,
     })
 
     return NextResponse.json(paciente)

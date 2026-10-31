@@ -41,3 +41,12 @@ prisma/backup-*.db
 
 # scripts locais do responsavel
 start-local.ps1
+
+# Arquivos operacionais locais (porta fixa / tunel)
+links.txt
+manter-no-ar.ps1
+start-tunnel.ps1
+
+# Artefatos locais de build/backup
+*.tsbuildinfo
+prisma/*.db.bak

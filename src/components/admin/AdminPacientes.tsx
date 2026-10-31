@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { dataNascimentoParaInput } from '@/lib/data-nascimento'
 import { Agendamento, Paciente } from '@/types'
 
 type PacienteComHistorico = Paciente & {
@@ -14,6 +15,7 @@ type PacienteComHistorico = Paciente & {
 type AnotacaoProntuario = {
   id: string
   texto: string
+  liberado: boolean
   criadoEm: string | Date
 }
 
@@ -104,6 +106,7 @@ function ProntuarioDatado({ pacienteId }: { pacienteId: string }) {
   const [texto, setTexto] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [alterandoId, setAlterandoId] = useState<string | null>(null)
 
   // Carrega as anotações ao abrir o painel do paciente.
   useEffect(() => {
@@ -134,6 +137,28 @@ function ProntuarioDatado({ pacienteId }: { pacienteId: string }) {
       setErro('Erro ao salvar a anotação. Tente novamente.')
     } finally {
       setSalvando(false)
+    }
+  }
+
+  const alternarLiberacao = async (nota: AnotacaoProntuario) => {
+    if (alterandoId) return
+    setAlterandoId(nota.id)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/admin/pacientes/${pacienteId}/prontuario`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anotacaoId: nota.id, liberado: !nota.liberado }),
+      })
+      if (!res.ok) throw new Error()
+      const atualizada = await res.json()
+      setNotas(prev =>
+        (prev || []).map(n => (n.id === nota.id ? { ...n, liberado: Boolean(atualizada.liberado) } : n))
+      )
+    } catch {
+      setErro('Não foi possível alterar a liberação. Tente novamente.')
+    } finally {
+      setAlterandoId(null)
     }
   }
 
@@ -175,9 +200,29 @@ function ProntuarioDatado({ pacienteId }: { pacienteId: string }) {
         ) : (
           notas.map(nota => (
             <div key={nota.id} className="p-3 rounded-lg bg-white border border-neutral-200">
-              <time className="text-xs text-neutral-500">
-                {format(new Date(nota.criadoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-              </time>
+              <div className="flex items-center justify-between gap-2">
+                <time className="text-xs text-neutral-500">
+                  {format(new Date(nota.criadoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                </time>
+                <button
+                  type="button"
+                  onClick={() => alternarLiberacao(nota)}
+                  disabled={alterandoId === nota.id}
+                  className={cn('badge cursor-pointer border transition-colors', nota.liberado
+                    ? 'badge-success border-green-300 hover:bg-green-100'
+                    : 'badge-neutral border-neutral-300 hover:bg-neutral-100')}
+                  aria-pressed={nota.liberado}
+                  title={nota.liberado
+                    ? 'Visível em "Minha consulta" do paciente'
+                    : 'Não aparece para o paciente'}
+                >
+                  {alterandoId === nota.id
+                    ? 'Salvando…'
+                    : nota.liberado
+                      ? 'Liberado ao paciente'
+                      : 'Não liberado'}
+                </button>
+              </div>
               <p className="text-sm text-neutral-700 whitespace-pre-line mt-1">{nota.texto}</p>
             </div>
           ))
@@ -266,6 +311,30 @@ function PacienteRow({
                     ? format(new Date(paciente.primeiroAgendamentoEm), 'dd/MM/yyyy HH:mm', { locale: ptBR })
                     : 'não registrado'}
                 </p>
+                <div className="pt-1">
+                  <label htmlFor={`nascimento-${paciente.id}`} className="font-medium text-neutral-800">
+                    Data de nascimento:
+                  </label>{' '}
+                  <input
+                    id={`nascimento-${paciente.id}`}
+                    type="date"
+                    defaultValue={dataNascimentoParaInput(paciente.dataNascimento)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    className="input mt-1 sm:mt-0 sm:ml-1 inline-block w-auto py-1.5 text-sm"
+                    onBlur={async e => {
+                      try {
+                        await fetch(`/api/admin/pacientes/${paciente.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ dataNascimento: e.target.value || null }),
+                        })
+                      } catch {}
+                    }}
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Usada como confirmação de identidade em &quot;Minha consulta&quot; (opcional).
+                  </p>
+                </div>
               </div>
 
               <div>

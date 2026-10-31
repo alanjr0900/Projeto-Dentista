@@ -378,6 +378,23 @@ function DadosPaciente({ dados, onChange, erro, servicoNome, dataHora }: DadosPa
         </div>
 
         <div className="form-group">
+          <label htmlFor="dataNascimento" className="label">Data de nascimento (opcional)</label>
+          <input
+            type="date"
+            id="dataNascimento"
+            name="dataNascimento"
+            autoComplete="bday"
+            value={dados?.dataNascimento || ''}
+            onChange={e => onChange('dataNascimento', e.target.value)}
+            className="input"
+            max={new Date().toISOString().slice(0, 10)}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Ajuda a confirmar sua identidade em &quot;Minha consulta&quot;, junto com o código.
+          </p>
+        </div>
+
+        <div className="form-group">
           <label htmlFor="email" className="label">E-mail (opcional)</label>
           <input
             type="email"
@@ -554,7 +571,7 @@ function Confirmacao({ agendamento, onAdicionarCalendario, onWhatsApp, onNovoAge
             <svg className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Para cancelar ou remarcar, avise com <strong>24h de antecedência</strong>
+            Para cancelar ou remarcar, avise com <strong>48 horas de antecedência</strong>
           </li>
         </ul>
       </div>
@@ -734,6 +751,7 @@ export function AbaAgendamento() {
           horario: estado.horario,
           nome: estado.dadosPaciente.nome,
           telefone: formatarTelefone(estado.dadosPaciente.telefone),
+          dataNascimento: estado.dadosPaciente.dataNascimento || undefined,
           email: estado.dadosPaciente.email,
           observacoes: estado.dadosPaciente.observacoes,
           consentimentoLGPD: estado.dadosPaciente.consentimentoLGPD,

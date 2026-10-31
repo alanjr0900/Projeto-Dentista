@@ -18,6 +18,15 @@ const allowedOrigins = [hostDoTunel(process.env.PUBLIC_TUNNEL_HOST), hostDoTunel
 )
 
 const nextConfig = {
+  // O type-check roda separadamente (`npm run typecheck` / `npx tsc --noEmit`).
+  // Em algumas VPS pequenas o worker de tipos do Next é encerrado por memória
+  // durante o build; o código continua sendo validado pelo comando acima.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       {
@@ -28,6 +37,17 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
   experimental: {
+    // Build com 1 worker: evita picos de memória em máquinas pequenas/VPS.
+    // Pode ser aumentado depois; não afeta o runtime.
+    cpus: 1,
+    webpackBuildWorker: false,
+    memoryBasedWorkersCount: false,
+    workerThreads: false,
+    // Pacotes grandes ficam fora do bundle do servidor (build mais leve).
+    serverComponentsExternalPackages: ['googleapis', '@prisma/client', 'nodemailer', 'bcryptjs'],
+    // Não precisamos de tracing de arquivos (não usamos output: standalone).
+    // Isso evita uma etapa pesada no fim do build em VPS pequena.
+    outputFileTracing: false,
     serverActions: {
       bodySizeLimit: '2mb',
     },

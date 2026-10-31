@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { cancelarRemarcarSchema } from '@/lib/validations'
 import { getConfiguracoes } from '@/lib/config'
 import { calcularDisponibilidade, validarHorarioDisponivel } from '@/lib/disponibilidade'
-import { addHours } from 'date-fns'
+import { normalizarCodigo } from '@/lib/codigo'
+import { PRAZO_CANCELAMENTO_HORAS, mensagemPrazoCancelamento, respeitaPrazo } from '@/lib/prazos'
 import { excluirEvento } from '@/lib/google/agenda'
 import { enviarCancelamento, linkGestao, emailConfigurado } from '@/lib/email'
 
@@ -25,7 +26,7 @@ export async function POST(
     const telefoneLimpo = telefone.replace(/\D/g, '')
 
     const agendamento = await prisma.agendamento.findUnique({
-      where: { codigo },
+      where: { codigo: normalizarCodigo(codigo) },
       include: { servico: true },
     })
 
@@ -45,21 +46,18 @@ export async function POST(
       return NextResponse.json({ erro: 'Não é possível cancelar consulta já realizada' }, { status: 400 })
     }
 
-    // Verificar antecedência mínima
-    const cfg = await getConfiguracoes()
+    // Verificar antecedência mínima (fonte única: src/lib/prazos.ts)
     const agora = new Date()
-    const limiteCancelamento = addHours(agendamento.dataHora, -cfg.antecedenciaMinimaHoras)
-    
-    if (agora > limiteCancelamento) {
+    if (!respeitaPrazo(agendamento.dataHora, PRAZO_CANCELAMENTO_HORAS, agora)) {
       return NextResponse.json(
-        { erro: `Cancelamento só é permitido com ${cfg.antecedenciaMinimaHoras}h de antecedência` },
-        { status: 400 }
+        { erro: mensagemPrazoCancelamento(), codigo: 'PRAZO' },
+        { status: 422 }
       )
     }
 
     // Cancelar
     await prisma.agendamento.update({
-      where: { codigo },
+      where: { codigo: normalizarCodigo(codigo) },
       data: {
         status: 'CANCELADO',
         canceladoEm: new Date(),
@@ -79,6 +77,7 @@ export async function POST(
     // E-mail de cancelamento para o paciente (fallback silencioso)
     if (emailConfigurado() && agendamento.pacienteEmail) {
       try {
+        const cfg = await getConfiguracoes()
         await enviarCancelamento({
           codigo: agendamento.codigo,
           pacienteNome: agendamento.pacienteNome,

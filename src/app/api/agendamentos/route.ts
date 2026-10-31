@@ -4,7 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { agendamentoCompletoSchema } from '@/lib/validations'
 import { calcularDisponibilidade, validarHorarioDisponivel } from '@/lib/disponibilidade'
 import { getConfiguracoes } from '@/lib/config'
-import { gerarCodigoAgendamento } from '@/lib/utils'
+import { gerarCodigoUnico } from '@/lib/codigo'
+import { parseDataNascimento } from '@/lib/data-nascimento'
+import { normalizarNomePessoa } from '@/lib/nome-pessoa'
 import { verificarRateLimit } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { googleAtivo, horarioLivre, criarEvento } from '@/lib/google/agenda'
@@ -102,27 +104,93 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar agendamento em transação para evitar race condition
-    const codigo = gerarCodigoAgendamento()
+    const codigo = await gerarCodigoUnico(async candidato => {
+      const existente = await prisma.agendamento.findUnique({
+        where: { codigo: candidato },
+        select: { id: true },
+      })
+      return Boolean(existente)
+    })
+
+    // Data de nascimento (opcional) — confirmação de identidade em "Minha consulta".
+    let dataNascimento: Date | null = null
+    if (dados.dataNascimento) {
+      dataNascimento = parseDataNascimento(dados.dataNascimento)
+      if (!dataNascimento) {
+        return NextResponse.json({ erro: 'Data de nascimento inválida' }, { status: 400 })
+      }
+    }
+
     // 3.3 — Vincular/criar o paciente ANTES, para ligar o agendamento a ele
     // (histórico da aba Pacientes) e registrar consentimento + 1º agendamento.
+    // Regra: se e-mail já existe, só permite agendar se o nome for o mesmo (ignorando maiúsculas, acentos, espaços extras).
     const telefoneDigitos = dados.telefone.replace(/\D/g, '')
     const agora = new Date()
     const datasAgendamento = new Date(`${dados.data}T${dados.horario}:00-03:00`)
 
-    const paciente = await prisma.paciente.upsert({
-      where: { telefone: telefoneDigitos },
-      update: {
-        nome: dados.nome,
-        email: dados.email || null,
-      },
-      create: {
-        nome: dados.nome,
-        telefone: telefoneDigitos,
-        email: dados.email || null,
-        consentimentoEm: agora,
-        primeiroAgendamentoEm: datasAgendamento,
-      },
-    })
+    let paciente
+    if (dados.email) {
+      const emailNormalizado = dados.email.trim().toLowerCase()
+      const candidatos = await prisma.paciente.findMany({
+        where: { email: { not: null } },
+        select: { id: true, nome: true, email: true },
+        orderBy: { atualizadoEm: 'desc' },
+      })
+      const existentesPorEmail = candidatos.filter(
+        candidato =>
+          candidato.email && candidato.email.trim().toLowerCase() === emailNormalizado
+      )
+
+      if (existentesPorEmail.length > 0) {
+        // Pode haver cadastros duplicados com o mesmo e-mail (dados antigos).
+        // Só permite se ALGUM deles tiver o mesmo nome pela regra do projeto.
+        const mesmoNome = existentesPorEmail.find(
+          candidato => normalizarNomePessoa(candidato.nome) === normalizarNomePessoa(dados.nome)
+        )
+        if (!mesmoNome) {
+          return NextResponse.json({ 
+            erro: 'Este e-mail já está cadastrado com outro nome. Use o mesmo nome ou entre em contato.' 
+          }, { status: 409 })
+        }
+        // Mesmo paciente: atualiza telefone e data de nascimento se vierem
+        paciente = await prisma.paciente.update({
+          where: { id: mesmoNome.id },
+          data: {
+            telefone: telefoneDigitos,
+            ...(dataNascimento ? { dataNascimento } : {}),
+          }
+        })
+      } else {
+        // Novo paciente com este e-mail
+        paciente = await prisma.paciente.create({
+          data: {
+            nome: dados.nome,
+            telefone: telefoneDigitos,
+            email: emailNormalizado,
+            dataNascimento,
+            consentimentoEm: agora,
+            primeiroAgendamentoEm: datasAgendamento,
+          }
+        })
+      }
+    } else {
+      // Sem e-mail: usa telefone como chave (comportamento legado)
+      paciente = await prisma.paciente.upsert({
+        where: { telefone: telefoneDigitos },
+        update: {
+          nome: dados.nome,
+          ...(dataNascimento ? { dataNascimento } : {}),
+        },
+        create: {
+          nome: dados.nome,
+          telefone: telefoneDigitos,
+          email: null,
+          dataNascimento,
+          consentimentoEm: agora,
+          primeiroAgendamentoEm: datasAgendamento,
+        },
+      })
+    }
 
     // Preenche o que faltar (paciente antigo criado antes destes campos).
     await prisma.paciente.updateMany({

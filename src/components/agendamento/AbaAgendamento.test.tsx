@@ -75,7 +75,7 @@ describe('AbaAgendamento', () => {
 
 // Teste de validação de telefone (usa a implementação REAL, sem mock)
 describe('formatarTelefone', () => {
-  const real = () => vi.importActual<Record<string, unknown>>('@/lib/utils')
+  const real = () => vi.importActual<typeof import('@/lib/utils')>('@/lib/utils')
 
   it('formata celular com 9 dígitos', async () => {
     const { formatarTelefone } = await real()

@@ -43,13 +43,42 @@ model Agendamento {
   canceladoEm      DateTime?
   canceladoPor     String?
   lembreteEnviado  Boolean   @default(false)
-  // Vínculo com o evento no Google Calendar (quando a integração está ativa).
-  // Permite cancelar/remarcar o evento certo sem buscar por texto no calendário.
   googleEventoId   String?
+  remarcacoes      Remarcacao[]
 
   @@index([dataHora, status])
   @@index([pacienteTelefone])
   @@index([codigo])
+}
+
+// Histórico de remarcações: quem remarcou, quando e de/para qual horário
+// (a tabela guarda o "de" e o "para"; `criadoEm` guarda o "quando").
+model Remarcacao {
+  id            String      @id @default(cuid())
+  agendamentoId String
+  agendamento   Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  de            DateTime
+  para          DateTime
+  por           String
+  criadoEm      DateTime    @default(now())
+
+  @@index([agendamentoId, criadoEm])
+}
+
+// Log de acesso do paciente aos próprios diagnósticos (LGPD): registra
+// quando e QUAIS registros foram lidos — nunca o conteúdo.
+model LogAcessoDiagnostico {
+  id            String   @id @default(cuid())
+  pacienteId    String
+  // Opcional: o acesso por código de e-mail é do PACIENTE (pode não haver
+  // uma consulta específica vinculada no momento).
+  agendamentoId String?
+  registros     String
+  quantidade    Int      @default(0)
+  ip            String?
+  criadoEm      DateTime @default(now())
+
+  @@index([pacienteId, criadoEm])
 }
 
 model BloqueioAgenda {
@@ -58,7 +87,7 @@ model BloqueioAgenda {
   fim        DateTime
   motivo     String?
   recorrente Boolean  @default(false)
-  diaSemana  Int? // 0-6 para recorrente (domingo=0)
+  diaSemana  Int? 
   criadoEm   DateTime @default(now())
 
   @@index([inicio, fim])
@@ -76,29 +105,108 @@ model Paciente {
   id                    String             @id @default(cuid())
   nome                  String
   telefone              String             @unique
+  dataNascimento        DateTime? 
   email                 String?
   anotacoes             String?
-  // Consentimento LGPD registrado com data/hora no primeiro agendamento.
   consentimentoEm       DateTime?
-  // Momento do primeiro agendamento feito pelo site (base da ordem cronológica).
   primeiroAgendamentoEm DateTime?
   anotacoesProntuario   AnotacaoPaciente[]
+  codigoAcesso          CodigoAcesso?
+  limitesEnvio          LimiteEnvioPaciente[]
   criadoEm              DateTime           @default(now())
   atualizadoEm          DateTime           @updatedAt
   agendamentos          Agendamento[]
 
   @@index([telefone])
   @@index([nome])
+  @@index([email])
 }
 
-// Prontuário do paciente: anotações DATADAS da dentista. Cada nota nova é
-// uma linha preservando o histórico (diferente do campo livre `anotacoes`).
 model AnotacaoPaciente {
   id         String   @id @default(cuid())
   pacienteId String
   paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   texto      String
+  liberado   Boolean  @default(false)
   criadoEm   DateTime @default(now())
 
   @@index([pacienteId, criadoEm])
+}
+
+// Códigos temporários de login por e-mail (senha de uso único, expira em 10 min)
+model CodigoAcesso {
+  id            String   @id @default(cuid())
+  codigoHash    String   // SHA256 do código (sem no GitHub)
+  pacienteId    String   @unique
+  paciente      Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  usado         Boolean  @default(false)
+  expiraEm      DateTime
+  tentativas    Int      @default(0)
+  bloqueado     Boolean  @default(false)
+  bloqueioAte   DateTime?
+  // Quantos códigos seguidos foram invalidados por excesso de tentativas.
+  // Ao chegar no limite (3), o e-mail fica 30 min sem poder pedir novo código.
+  bloqueiosConsecutivos Int @default(0)
+  criadoEm      DateTime @default(now())
+  usadoEm       DateTime?
+
+  @@index([pacienteId, criadoEm])
+  @@index([expiraEm])
+  @@index([usado])
+}
+
+// Controle de envios por e-mail (quota: 3 códigos/hora)
+model LimiteEnvioPaciente {
+  id           String   @id @default(cuid())
+  pacienteId   String
+  paciente     Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  chave        String   @unique // 'email' + ':' + e-mail
+  ultimaHorario DateTime
+  quantidade   Int      @default(0)
+  criadoEm     DateTime @default(now())
+
+  @@index([pacienteId, criadoEm])
+  @@index([chave])
+}
+
+// Controle de envios por IP (quota: 10 pedidos/hora, 60s intervalo mínimo)
+model LimiteEnvioIp {
+  id           String   @id @default(cuid())
+  chave        String   @unique // hash do IP (nunca o IP puro)
+  janelaInicio  DateTime @default(now())
+  ultimaHorario DateTime
+  quantidade   Int      @default(0)
+  criadoEm     DateTime @default(now())
+
+  @@index([chave])
+  @@index([janelaInicio])
+  @@index([criadoEm])
+}
+
+// Controle de envios por E-MAIL (quota: 3 códigos/hora, 60s entre envios).
+// A chave é o hash do e-mail — funciona mesmo para e-mails que não existem
+// no banco, sem gravar o endereço em texto puro.
+model LimiteEnvioEmail {
+  id            String   @id @default(cuid())
+  chave         String   @unique // hash HMAC do e-mail
+  janelaInicio  DateTime @default(now())
+  quantidade    Int      @default(0)
+  ultimoEnvioEm DateTime @default(now())
+  criadoEm      DateTime @default(now())
+
+  @@index([chave])
+  @@index([janelaInicio])
+}
+
+// Auditoria mínima de tentativas de validação (sem código e sem e-mail puro).
+model TentativaAcesso {
+  id        String   @id @default(cuid())
+  emailHash String
+  ipHash    String?
+  sucesso   Boolean  @default(false)
+  motivo    String?
+  criadoEm  DateTime @default(now())
+
+  @@index([emailHash, criadoEm])
+  @@index([criadoEm])
 }
